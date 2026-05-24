@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
+  Bot,
   Bug,
   ChevronDown,
   Download,
@@ -50,6 +51,8 @@ interface ToolbarProps {
   onSave?: () => Promise<void>
   onExport?: () => void
   onExportBundle?: () => void
+  chatOpen?: boolean
+  onToggleChat?: () => void
 }
 
 export const Toolbar = memo(function Toolbar({
@@ -59,6 +62,8 @@ export const Toolbar = memo(function Toolbar({
   onSave,
   onExport,
   onExportBundle,
+  chatOpen = false,
+  onToggleChat,
 }: ToolbarProps) {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -234,6 +239,20 @@ export const Toolbar = memo(function Toolbar({
             <Github className="h-4 w-4" />
           </a>
         </Button>
+        {onToggleChat && (
+          <Button
+            variant={chatOpen ? 'default' : 'outline'}
+            size="sm"
+            className="gap-1.5"
+            onClick={onToggleChat}
+            aria-label="Toggle AI chat"
+            data-tooltip="AI Chat"
+            data-tooltip-side="bottom"
+          >
+            <Bot className="h-4 w-4" />
+            AI
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"

@@ -15,6 +15,65 @@ const toolIgnorePatterns = [
   'scripts/**',
 ]
 
+// Vite plugin: proxy /api/claude to Anthropic (local dev only)
+function claudeApiProxy() {
+  return {
+    name: 'claude-api-proxy',
+    configureServer(server: {
+      middlewares: {
+        use: (
+          path: string,
+          handler: (
+            req: import('http').IncomingMessage,
+            res: import('http').ServerResponse,
+          ) => void,
+        ) => void
+      }
+    }) {
+      server.middlewares.use('/api/claude', (req, res) => {
+        const chunks: Buffer[] = []
+        req.on('data', (chunk: Buffer) => chunks.push(chunk))
+        req.on('end', () => {
+          const body = Buffer.concat(chunks).toString()
+          const apiKey =
+            (req.headers as Record<string, string | undefined>)['x-claude-api-key'] ??
+            process.env['ANTHROPIC_API_KEY']
+          if (!apiKey) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json')
+            res.end(
+              JSON.stringify({
+                error: { message: 'No API key — enter your Anthropic key in the AI Chat panel.' },
+              }),
+            )
+            return
+          }
+          fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+            },
+            body,
+          })
+            .then(async (r) => {
+              const data = await r.text()
+              res.statusCode = r.status
+              res.setHeader('Content-Type', 'application/json')
+              res.end(data)
+            })
+            .catch((err: unknown) => {
+              res.statusCode = 500
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: { message: String(err) } }))
+            })
+        })
+      })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   lint: {
@@ -43,7 +102,7 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
     },
   },
-  plugins: lazyPlugins(() => [react(), tailwindcss()]),
+  plugins: lazyPlugins(() => [react(), tailwindcss(), claudeApiProxy()]),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -38,6 +38,7 @@
     "prepare": "vp config"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
     "@hookform/resolvers": "5.2.2",
     "@huggingface/transformers": "4.1.0",
     "@mediabunny/ac3": "1.40.1",

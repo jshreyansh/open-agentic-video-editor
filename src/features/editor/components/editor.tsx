@@ -38,6 +38,7 @@ import { useProjectStore } from '@/features/editor/deps/projects'
 import { importExportDialog } from '@/features/editor/deps/export-contract'
 import { prewarmEffectPreviews } from '@/features/editor/deps/effects-contract'
 import { getEditorLayout, getEditorLayoutCssVars } from '@/config/editor-layout'
+import { ChatPanel } from '@/features/ai-chat'
 import {
   createProjectUpgradeBackup,
   formatProjectUpgradeBackupName,
@@ -231,6 +232,7 @@ export const LoadedEditor = memo(function LoadedEditor({
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [bundleExportDialogOpen, setBundleExportDialogOpen] = useState(false)
   const [bundleFileHandle, setBundleFileHandle] = useState<FileSystemFileHandle | undefined>()
+  const [chatOpen, setChatOpen] = useState(false)
   const editorDensity = useSettingsStore((s) => s.editorDensity)
   const snapEnabledPreference = useSettingsStore((s) => s.snapEnabled)
   const editorLayout = getEditorLayout(editorDensity)
@@ -480,6 +482,8 @@ export const LoadedEditor = memo(function LoadedEditor({
           onSave={handleSave}
           onExport={handleExport}
           onExportBundle={handleExportBundle}
+          chatOpen={chatOpen}
+          onToggleChat={() => setChatOpen((v) => !v)}
         />
       </InteractionLockRegion>
 
@@ -563,6 +567,15 @@ export const LoadedEditor = memo(function LoadedEditor({
               <PropertiesSidebar />
             </ErrorBoundary>
           </InteractionLockRegion>
+        )}
+
+        {/* AI Chat Panel */}
+        {chatOpen && (
+          <div className="w-80 shrink-0 overflow-hidden">
+            <ErrorBoundary level="feature">
+              <ChatPanel onClose={() => setChatOpen(false)} />
+            </ErrorBoundary>
+          </div>
         )}
       </div>
 
