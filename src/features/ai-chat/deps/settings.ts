@@ -1,1 +1,1 @@
-export { useSettingsStore } from '@/features/editor/deps/settings'
+export { useSettingsStore } from './editor-contract'

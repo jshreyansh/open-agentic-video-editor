@@ -3,3 +3,4 @@
  */
 
 export * from '@/features/timeline/contracts/editor'
+export { rippleInsertFromMedia } from '@/features/timeline/stores/actions/item-actions'

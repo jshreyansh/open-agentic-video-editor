@@ -1,1 +1,1 @@
-export { useProjectStore } from '@/features/editor/deps/projects'
+export { useProjectStore } from './editor-contract'

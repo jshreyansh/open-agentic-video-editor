@@ -1,1 +1,1 @@
-export { ChatPanel } from '@/features/ai-chat'
+export { ChatPanel } from './ai-chat-contract'
