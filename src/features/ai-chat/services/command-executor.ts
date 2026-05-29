@@ -1,25 +1,22 @@
 import { createLogger } from '@/shared/logging/logger'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
 import {
   findCompatibleTrackForItemType,
   findNearestAvailableSpace,
-} from '@/features/editor/deps/timeline-utils'
-import { useProjectStore } from '@/features/editor/deps/projects'
+} from '@/features/ai-chat/deps/timeline-utils'
+import { useProjectStore } from '@/features/ai-chat/deps/projects'
 import {
   removeItems,
   moveItem,
   updateItem,
   addItem,
-} from '@/features/timeline/stores/actions/item-actions'
-import { splitItem } from '@/features/timeline/stores/actions/edit/split-actions'
-import { trimItemStart, trimItemEnd } from '@/features/timeline/stores/actions/edit/trim-actions'
-import { addKeyframes, removeKeyframes } from '@/features/timeline/stores/actions/keyframe-actions'
-import {
-  addTransition,
-  removeTransition,
-} from '@/features/timeline/stores/actions/transition-actions'
-import { useKeyframesStore } from '@/features/timeline/stores/keyframes-store'
-import { useTransitionsStore } from '@/features/timeline/stores/transitions-store'
+} from '@/features/ai-chat/deps/timeline-actions'
+import { splitItem } from '@/features/ai-chat/deps/timeline-actions'
+import { trimItemStart, trimItemEnd } from '@/features/ai-chat/deps/timeline-actions'
+import { addKeyframes, removeKeyframes } from '@/features/ai-chat/deps/timeline-actions'
+import { addTransition, removeTransition } from '@/features/ai-chat/deps/timeline-actions'
+import { useKeyframesStore } from '@/features/ai-chat/deps/timeline-stores'
+import { useTransitionsStore } from '@/features/ai-chat/deps/timeline-stores'
 import { generateTtsAudio } from './tts-provider'
 import { saveGeneratedAudio } from '@/infrastructure/storage/generated-audio'
 import type { TextItem, AudioItem } from '@/types/timeline'

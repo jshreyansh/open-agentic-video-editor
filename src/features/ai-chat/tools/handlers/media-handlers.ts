@@ -1,10 +1,10 @@
 import { registerTool } from '../tool-registry'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
 import {
   findCompatibleTrackForItemType,
   findNearestAvailableSpace,
-} from '@/features/editor/deps/timeline-utils'
-import { addItem } from '@/features/timeline/stores/actions/item-actions'
+} from '@/features/ai-chat/deps/timeline-utils'
+import { addItem } from '@/features/ai-chat/deps/timeline-actions'
 import { generateTtsAudio } from '../../services/tts-provider'
 import { saveGeneratedAudio } from '@/infrastructure/storage/generated-audio'
 import type { TextItem, AudioItem } from '@/types/timeline'

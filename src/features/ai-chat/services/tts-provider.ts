@@ -1,4 +1,4 @@
-import { useSettingsStore } from '@/features/editor/deps/settings'
+import { useSettingsStore } from '@/features/ai-chat/deps/settings'
 import { generateVoiceover } from './gemini-tts'
 import { generateVoiceoverCartesia } from './cartesia-tts'
 

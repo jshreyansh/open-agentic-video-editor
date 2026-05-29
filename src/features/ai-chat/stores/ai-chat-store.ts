@@ -2,12 +2,12 @@ import { create } from 'zustand'
 import { runAgentLoop } from '../services/agent-loop'
 import { serializeTimeline } from '../services/timeline-context'
 import { extractSegmentFrames } from '../services/video-analyzer'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
 import {
   captureSnapshot,
   restoreSnapshot,
   type TimelineSnapshot,
-} from '@/features/editor/deps/timeline-store'
+} from '@/features/ai-chat/deps/timeline-store'
 import type { AgentEvent } from '../services/agent-events'
 
 function parseSegmentFrames(

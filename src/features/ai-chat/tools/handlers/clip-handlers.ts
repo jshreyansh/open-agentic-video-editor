@@ -1,17 +1,17 @@
 import { registerTool } from '../tool-registry'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
 import {
   findCompatibleTrackForItemType,
   findNearestAvailableSpace,
-} from '@/features/editor/deps/timeline-utils'
+} from '@/features/ai-chat/deps/timeline-utils'
 import {
   removeItems,
   moveItem,
   updateItem,
   addItem,
-} from '@/features/timeline/stores/actions/item-actions'
-import { splitItem } from '@/features/timeline/stores/actions/edit/split-actions'
-import { trimItemStart, trimItemEnd } from '@/features/timeline/stores/actions/edit/trim-actions'
+} from '@/features/ai-chat/deps/timeline-actions'
+import { splitItem } from '@/features/ai-chat/deps/timeline-actions'
+import { trimItemStart, trimItemEnd } from '@/features/ai-chat/deps/timeline-actions'
 import type { TextItem } from '@/types/timeline'
 
 registerTool({

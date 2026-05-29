@@ -1,7 +1,7 @@
 import { registerTool } from '../tool-registry'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
-import { createClassicTrack } from '@/features/timeline/utils/classic-tracks'
-import type { TrackKind } from '@/features/timeline/utils/classic-tracks'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
+import { createClassicTrack } from '@/features/ai-chat/deps/classic-tracks'
+import type { TrackKind } from '@/features/ai-chat/deps/classic-tracks'
 
 registerTool({
   name: 'list_tracks',

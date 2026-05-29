@@ -1,5 +1,5 @@
 import { createLogger } from '@/shared/logging/logger'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
 import type { VideoItem } from '@/types/timeline'
 
 const log = createLogger('ai-chat:video-analyzer')

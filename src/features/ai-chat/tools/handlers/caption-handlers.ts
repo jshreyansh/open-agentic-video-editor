@@ -1,10 +1,10 @@
 import { registerTool } from '../tool-registry'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
 import {
   findCompatibleTrackForItemType,
   findNearestAvailableSpace,
-} from '@/features/editor/deps/timeline-utils'
-import { addItem } from '@/features/timeline/stores/actions/item-actions'
+} from '@/features/ai-chat/deps/timeline-utils'
+import { addItem } from '@/features/ai-chat/deps/timeline-actions'
 import type { TextItem } from '@/types/timeline'
 
 function parseTimeToFrames(time: string, fps: number): number {

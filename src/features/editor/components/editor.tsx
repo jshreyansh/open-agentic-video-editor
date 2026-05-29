@@ -38,7 +38,7 @@ import { useProjectStore } from '@/features/editor/deps/projects'
 import { importExportDialog } from '@/features/editor/deps/export-contract'
 import { prewarmEffectPreviews } from '@/features/editor/deps/effects-contract'
 import { getEditorLayout, getEditorLayoutCssVars } from '@/config/editor-layout'
-import { ChatPanel } from '@/features/ai-chat'
+import { ChatPanel } from '@/features/editor/deps/ai-chat'
 import {
   AlertDialog,
   AlertDialogAction,

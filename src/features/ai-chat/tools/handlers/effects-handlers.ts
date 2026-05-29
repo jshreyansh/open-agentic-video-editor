@@ -1,14 +1,11 @@
 import { registerTool } from '../tool-registry'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
-import { useKeyframesStore } from '@/features/editor/deps/timeline-store'
-import { useTransitionsStore } from '@/features/timeline/stores/transitions-store'
-import { addKeyframes, removeKeyframes } from '@/features/timeline/stores/actions/keyframe-actions'
-import {
-  addTransition,
-  removeTransition,
-} from '@/features/timeline/stores/actions/transition-actions'
-import { addEffect } from '@/features/timeline/stores/actions/effect-actions'
-import { useProjectStore } from '@/features/editor/deps/projects'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
+import { useKeyframesStore } from '@/features/ai-chat/deps/timeline-store'
+import { useTransitionsStore } from '@/features/ai-chat/deps/timeline-stores'
+import { addKeyframes, removeKeyframes } from '@/features/ai-chat/deps/timeline-actions'
+import { addTransition, removeTransition } from '@/features/ai-chat/deps/timeline-actions'
+import { addEffect } from '@/features/ai-chat/deps/timeline-actions'
+import { useProjectStore } from '@/features/ai-chat/deps/projects'
 import type { TransitionPresentation } from '@/types/transition'
 import type { KeyframeRef } from '@/types/keyframe'
 

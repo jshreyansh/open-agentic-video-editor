@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/shared/ui/cn'
 import { transcribeAudio } from '../services/audio-transcriber'
 import type { GeminiVoice } from '../services/gemini-tts'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
 import {
   findCompatibleTrackForItemType,
   findNearestAvailableSpace,
-} from '@/features/editor/deps/timeline-utils'
-import { addItem } from '@/features/timeline/stores/actions/item-actions'
+} from '@/features/ai-chat/deps/timeline-utils'
+import { addItem } from '@/features/ai-chat/deps/timeline-actions'
 import type { AudioItem, TextItem } from '@/types/timeline'
 
 const VOICES: GeminiVoice[] = ['Kore', 'Aoede', 'Puck', 'Charon', 'Fenrir', 'Zephyr']

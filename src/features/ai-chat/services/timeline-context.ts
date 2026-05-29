@@ -1,6 +1,6 @@
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
-import { useKeyframesStore } from '@/features/editor/deps/timeline-store'
-import { useTransitionsStore } from '@/features/timeline/stores/transitions-store'
+import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
+import { useKeyframesStore } from '@/features/ai-chat/deps/timeline-store'
+import { useTransitionsStore } from '@/features/ai-chat/deps/timeline-stores'
 import type { TextItem } from '@/types/timeline'
 
 function framesToTimestamp(frames: number, fps: number): string {
