@@ -41,6 +41,7 @@ export const useSelectionStore = create<SelectionState & SelectionActions>((set)
   activeSnapTarget: null,
   activeLinkedDropTarget: null,
   dragState: null,
+  insertIndicatorFrame: null,
   expandedKeyframeLanes: new Set<string>(),
 
   // Actions
@@ -159,6 +160,7 @@ export const useSelectionStore = create<SelectionState & SelectionActions>((set)
   setActiveSnapTarget: (activeSnapTarget) => set({ activeSnapTarget }),
   setActiveLinkedDropTarget: (activeLinkedDropTarget) => set({ activeLinkedDropTarget }),
   setActiveTool: (tool) => set({ activeTool: tool }),
+  setInsertIndicatorFrame: (frame) => set({ insertIndicatorFrame: frame }),
   // Keyframe lanes expansion
   toggleKeyframeLanes: (itemId) =>
     set((state) => {

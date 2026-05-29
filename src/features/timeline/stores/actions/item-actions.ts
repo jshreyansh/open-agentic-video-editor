@@ -14,6 +14,11 @@ import { useSelectionStore } from '@/shared/state/selection'
 import { execute, applyTransitionRepairs, warnIfOverlapping } from './shared'
 import { buildLinkedLeftShiftUpdates, expandIdsWithLinkedItems } from './linked-edit'
 import { propagateRemovedIntervalsToSyncLockedTracks } from './sync-lock-ripple'
+import { useMediaLibraryStore } from '@/features/timeline/deps/media-library-store'
+import { useProjectStore } from '@/features/timeline/deps/projects'
+import { resolveMediaUrl, getMediaType } from '@/features/timeline/deps/media-library-resolver'
+import { buildMediaTimelineItem } from '../../utils/media-timeline-item-builder'
+import { getTrackKind } from '../../utils/classic-tracks'
 import {
   canLinkSelection,
   expandSelectionWithLinkedItems,
@@ -694,6 +699,175 @@ export function duplicateItemsWithTrackChanges(
     },
     { itemIds, count: positions.length, trackCount: tracks.length },
   )
+}
+
+/**
+ * Insert an item at a specific frame by ripple-shifting everything on the
+ * target track that starts at or after insertFrame to the right.
+ * Committed as a single undo entry.
+ */
+export function rippleInsertItem(itemId: string, targetTrackId: string, insertFrame: number): void {
+  const items = useItemsStore.getState().items
+  const item = items.find((i) => i.id === itemId)
+  if (!item) return
+
+  const shiftAmount = item.durationInFrames
+  const updates: Array<{ id: string; from: number; trackId?: string }> = []
+
+  // Shift every item on the target track that starts at or after the insert point
+  for (const ti of items) {
+    if (ti.id === itemId) continue
+    if (ti.trackId === targetTrackId && ti.from >= insertFrame) {
+      updates.push({ id: ti.id, from: ti.from + shiftAmount })
+    }
+  }
+
+  // Place the inserted item itself at the insert frame
+  updates.push({ id: itemId, from: insertFrame, trackId: targetTrackId })
+
+  execute(
+    'RIPPLE_INSERT_ITEM',
+    () => {
+      useItemsStore.getState()._moveItems(updates)
+      applyTransitionRepairs(updates.map((u) => u.id))
+      useTimelineSettingsStore.getState().markDirty()
+    },
+    { itemId, insertFrame, targetTrackId },
+  )
+}
+
+// Multi-item ripple insert — handles linked V+A pairs and any group.
+// Each entry ripple-shifts its own track, then places the item at insertFrame.
+export function rippleInsertItems(
+  inserts: Array<{ itemId: string; targetTrackId: string; insertFrame: number }>,
+): void {
+  const items = useItemsStore.getState().items
+  const insertIdSet = new Set(inserts.map((i) => i.itemId))
+  const updates: Array<{ id: string; from: number; trackId?: string }> = []
+
+  for (const { itemId, targetTrackId, insertFrame } of inserts) {
+    const item = items.find((i) => i.id === itemId)
+    if (!item) continue
+    const shiftAmount = item.durationInFrames
+    for (const ti of items) {
+      if (insertIdSet.has(ti.id)) continue
+      if (ti.trackId === targetTrackId && ti.from >= insertFrame) {
+        if (!updates.find((u) => u.id === ti.id)) {
+          updates.push({ id: ti.id, from: ti.from + shiftAmount })
+        }
+      }
+    }
+    updates.push({ id: itemId, from: insertFrame, trackId: targetTrackId })
+  }
+
+  execute(
+    'RIPPLE_INSERT_ITEMS',
+    () => {
+      useItemsStore.getState()._moveItems(updates)
+      applyTransitionRepairs(updates.map((u) => u.id))
+      useTimelineSettingsStore.getState().markDirty()
+    },
+    { count: inserts.length },
+  )
+}
+
+// Ripple-insert pre-built TimelineItem objects (not yet in the store).
+// Each item's `from` field is the desired insert frame.
+// Items on the same track shift everything at >= that frame by the item's duration.
+export function rippleInsertNewItems(items: TimelineItem[]): void {
+  const existingItems = useItemsStore.getState().items
+  const insertIdSet = new Set(items.map((i) => i.id))
+
+  // Ripple all tracks: shift every existing item at or after the insert point.
+  // Use the earliest `from` and the (uniform) duration from the inserted items.
+  const insertFrame = Math.min(...items.map((i) => i.from))
+  const shiftAmount = items[0]?.durationInFrames ?? 0
+
+  const updates: Array<{ id: string; from: number }> = []
+  for (const existing of existingItems) {
+    if (insertIdSet.has(existing.id)) continue
+    if (existing.from >= insertFrame) {
+      updates.push({ id: existing.id, from: existing.from + shiftAmount })
+    }
+  }
+
+  execute(
+    'RIPPLE_INSERT_NEW_ITEMS',
+    () => {
+      if (updates.length > 0) useItemsStore.getState()._moveItems(updates)
+      for (const item of items) useItemsStore.getState()._addItem(item)
+      applyTransitionRepairs([...items.map((i) => i.id), ...updates.map((u) => u.id)])
+      useTimelineSettingsStore.getState().markDirty()
+    },
+    { count: items.length },
+  )
+}
+
+// Resolve a media library item to timeline clips and ripple-insert them.
+// targetTrackId is the primary track (video/image/audio) to insert onto.
+export async function rippleInsertFromMedia(
+  mediaId: string,
+  insertFrame: number,
+  targetTrackId: string,
+): Promise<void> {
+  const media = useMediaLibraryStore.getState().mediaById[mediaId]
+  if (!media) return
+
+  const fps = useTimelineSettingsStore.getState().fps
+  const project = useProjectStore.getState().currentProject
+  const canvasWidth = project?.metadata.width ?? 1920
+  const canvasHeight = project?.metadata.height ?? 1080
+
+  const resolvedType = getMediaType(media.mimeType)
+  if (resolvedType === 'unknown') return
+  const mediaType = resolvedType
+  const blobUrl = await resolveMediaUrl(mediaId)
+
+  const originId = crypto.randomUUID()
+  const hasAudio = mediaType === 'video' && !!media.audioCodec
+  const linkedGroupId = hasAudio ? crypto.randomUUID() : undefined
+
+  const primaryItem = buildMediaTimelineItem({
+    media,
+    mediaId,
+    mediaType,
+    label: media.fileName,
+    projectFps: fps,
+    blobUrl,
+    thumbnailUrl: null,
+    canvasWidth,
+    canvasHeight,
+    placement: { trackId: targetTrackId, from: insertFrame },
+    originId,
+    linkedGroupId,
+  })
+
+  const items: TimelineItem[] = [primaryItem]
+
+  if (hasAudio && linkedGroupId) {
+    const audioTrack = useItemsStore
+      .getState()
+      .tracks.find((t) => !t.isGroup && getTrackKind(t) === 'audio' && !t.locked)
+    if (audioTrack) {
+      const audioItem = buildMediaTimelineItem({
+        media,
+        mediaId,
+        mediaType: 'audio',
+        label: media.fileName,
+        projectFps: fps,
+        blobUrl,
+        thumbnailUrl: null,
+        canvasWidth,
+        canvasHeight,
+        placement: { trackId: audioTrack.id, from: insertFrame },
+        originId,
+        linkedGroupId,
+      })
+      items.push(audioItem)
+    }
+  }
+
+  rippleInsertNewItems(items)
 }
 
 export * from './item-edit-actions'

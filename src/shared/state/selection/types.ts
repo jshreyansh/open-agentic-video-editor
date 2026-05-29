@@ -34,6 +34,8 @@ export interface SelectionState {
   activeLinkedDropTarget: SelectionLinkedDropTarget
   // Drag state for visual feedback
   dragState: SelectionDragState
+  /** Frame position of the insert-mode blade indicator during ⌘-drag. Null when not in insert mode. */
+  insertIndicatorFrame: number | null
   // Keyframe lanes expansion state
   expandedKeyframeLanes: Set<string> // Set of item IDs with expanded keyframe lanes
 }
@@ -52,6 +54,7 @@ export interface SelectionActions {
   setActiveSnapTarget: (target: SelectionSnapTarget) => void
   setActiveLinkedDropTarget: (target: SelectionLinkedDropTarget) => void
   setActiveTool: (tool: SelectionState['activeTool']) => void
+  setInsertIndicatorFrame: (frame: number | null) => void
   // Keyframe lanes expansion
   toggleKeyframeLanes: (itemId: string) => void
   setKeyframeLanesExpanded: (itemId: string, expanded: boolean) => void

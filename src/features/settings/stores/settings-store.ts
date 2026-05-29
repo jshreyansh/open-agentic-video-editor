@@ -52,6 +52,34 @@ interface AppSettings {
 
   // Keyboard shortcuts
   hotkeyOverrides: HotkeyOverrideMap
+
+  // TTS / Voiceover provider
+  aiVoiceProvider: TtsProvider
+  geminiTtsVoice: GeminiTtsVoice
+  cartesiaApiKey: string
+  cartesiaVoiceId: string
+}
+
+export type TtsProvider = 'gemini' | 'cartesia'
+export type GeminiTtsVoice = 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Aoede' | 'Orbit' | 'Zephyr'
+
+export const GEMINI_TTS_VOICES: { name: GeminiTtsVoice; description: string }[] = [
+  { name: 'Puck', description: 'Upbeat, clear (male)' },
+  { name: 'Charon', description: 'Deep, authoritative (male)' },
+  { name: 'Kore', description: 'Warm, friendly (female)' },
+  { name: 'Fenrir', description: 'Confident, energetic (male)' },
+  { name: 'Aoede', description: 'Smooth, professional (female)' },
+  { name: 'Orbit', description: 'Bright, approachable (neutral)' },
+  { name: 'Zephyr', description: 'Calm, soothing (neutral)' },
+]
+
+function normalizeTtsProvider(value: unknown): TtsProvider {
+  return value === 'cartesia' ? 'cartesia' : 'gemini'
+}
+
+function normalizeGeminiVoice(value: unknown): GeminiTtsVoice {
+  const valid: GeminiTtsVoice[] = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Aoede', 'Orbit', 'Zephyr']
+  return valid.includes(value as GeminiTtsVoice) ? (value as GeminiTtsVoice) : 'Kore'
 }
 
 export type CaptionSearchMode = 'keyword' | 'semantic'
@@ -129,7 +157,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
   // Performance
   maxUndoHistory: 50,
-  autoSaveInterval: 0, // Auto-save disabled by default
+  autoSaveInterval: 1, // Auto-save every 1 minute by default
 
   // Whisper defaults
   defaultWhisperModel: DEFAULT_WHISPER_MODEL,
@@ -145,6 +173,12 @@ const DEFAULT_SETTINGS: AppSettings = {
 
   // Keyboard shortcuts
   hotkeyOverrides: {},
+
+  // TTS / Voiceover provider
+  aiVoiceProvider: 'gemini',
+  geminiTtsVoice: 'Kore',
+  cartesiaApiKey: '',
+  cartesiaVoiceId: '',
 }
 
 /**
@@ -267,6 +301,12 @@ export const useSettingsStore = create<SettingsStore>()(
             captioningIntervalUnit,
           ),
           captionSearchMode: normalizeCaptionSearchMode(typedState.captionSearchMode),
+          aiVoiceProvider: normalizeTtsProvider(typedState.aiVoiceProvider),
+          geminiTtsVoice: normalizeGeminiVoice(typedState.geminiTtsVoice),
+          cartesiaApiKey:
+            typeof typedState.cartesiaApiKey === 'string' ? typedState.cartesiaApiKey : '',
+          cartesiaVoiceId:
+            typeof typedState.cartesiaVoiceId === 'string' ? typedState.cartesiaVoiceId : '',
         }
       },
     },

@@ -33,7 +33,16 @@ import {
   Rows3,
   HardDrive,
   Sparkles,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   LocalInferenceUnloadControl,
   LocalModelCacheControl,
@@ -41,7 +50,10 @@ import {
   CAPTIONING_INTERVAL_BOUNDS,
   DEFAULT_CAPTIONING_INTERVAL_SECONDS,
   resolveCaptioningIntervalSec,
+  GEMINI_TTS_VOICES,
   type CaptioningIntervalUnit,
+  type TtsProvider,
+  type GeminiTtsVoice,
 } from '@/features/editor/deps/settings'
 import {
   useMediaLibraryStore,
@@ -360,6 +372,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const maxUndoHistory = useSettingsStore((s) => s.maxUndoHistory)
   const captioningIntervalUnit = useSettingsStore((s) => s.captioningIntervalUnit)
   const captioningIntervalValue = useSettingsStore((s) => s.captioningIntervalValue)
+  const aiVoiceProvider = useSettingsStore((s) => s.aiVoiceProvider)
+  const geminiTtsVoice = useSettingsStore((s) => s.geminiTtsVoice)
+  const cartesiaApiKey = useSettingsStore((s) => s.cartesiaApiKey)
+  const cartesiaVoiceId = useSettingsStore((s) => s.cartesiaVoiceId)
   const setSetting = useSettingsStore((s) => s.setSetting)
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
 
@@ -372,6 +388,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const proxyStatus = useMediaLibraryStore((s) => s.proxyStatus)
 
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('general')
+  const [showApiKey, setShowApiKey] = useState(false)
   const [clearState, setClearState] = useState<'idle' | 'clearing' | 'done' | 'partial'>('idle')
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [regenState, setRegenState] = useState<'idle' | 'working' | 'done' | 'partial'>('idle')
@@ -613,6 +630,99 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
               {activeSection === 'ai' && (
                 <div className="space-y-3">
+                  {/* TTS Provider */}
+                  <div className="space-y-2.5">
+                    <div>
+                      <Label className="text-sm">Voiceover Provider</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Select which service generates AI voiceovers
+                      </p>
+                    </div>
+                    <div className="flex items-center rounded-md border border-border bg-secondary p-0.5 w-fit">
+                      {(['gemini', 'cartesia'] as TtsProvider[]).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setSetting('aiVoiceProvider', p)}
+                          className={cn(
+                            'rounded px-3 py-1 text-xs transition-colors capitalize',
+                            aiVoiceProvider === p
+                              ? 'bg-primary/15 text-primary'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {p === 'gemini' ? 'Google Gemini' : 'Cartesia'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {aiVoiceProvider === 'gemini' && (
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm text-muted-foreground">Voice</Label>
+                        <Select
+                          value={geminiTtsVoice}
+                          onValueChange={(v) => setSetting('geminiTtsVoice', v as GeminiTtsVoice)}
+                        >
+                          <SelectTrigger className="h-8 w-48 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {GEMINI_TTS_VOICES.map((v) => (
+                              <SelectItem key={v.name} value={v.name} className="text-xs">
+                                <span className="font-medium">{v.name}</span>
+                                <span className="ml-1.5 text-muted-foreground">
+                                  {v.description}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {aiVoiceProvider === 'cartesia' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label className="text-sm text-muted-foreground shrink-0">API Key</Label>
+                          <div className="relative flex-1 max-w-64">
+                            <Input
+                              type={showApiKey ? 'text' : 'password'}
+                              className="h-8 text-xs pr-8"
+                              placeholder="sk-…"
+                              value={cartesiaApiKey}
+                              onChange={(e) => setSetting('cartesiaApiKey', e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowApiKey((v) => !v)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              {showApiKey ? (
+                                <EyeOff className="w-3.5 h-3.5" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <Label className="text-sm text-muted-foreground shrink-0">Voice ID</Label>
+                          <Input
+                            className="h-8 text-xs max-w-64"
+                            placeholder="Cloned voice ID from Cartesia"
+                            value={cartesiaVoiceId}
+                            onChange={(e) => setSetting('cartesiaVoiceId', e.target.value)}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Clone your voice at cartesia.ai, then paste the Voice ID here.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator className="bg-white/8" />
+
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">

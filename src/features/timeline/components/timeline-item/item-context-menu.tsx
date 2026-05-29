@@ -89,6 +89,7 @@ interface ItemContextMenuProps {
   canRemoveFillers?: boolean
   isRemovingFillers?: boolean
   onRemoveFillers?: () => void
+  onRippleInsertBefore?: () => void
 }
 
 /**
@@ -153,6 +154,7 @@ export const ItemContextMenu = memo(function ItemContextMenu({
   canRemoveFillers,
   isRemovingFillers,
   onRemoveFillers,
+  onRippleInsertBefore,
 }: ItemContextMenuProps) {
   // Lazy mount: defer the full Radix ContextMenu tree until first right-click.
   // This eliminates ~10 Radix provider components per item from the render tree
@@ -228,6 +230,7 @@ export const ItemContextMenu = memo(function ItemContextMenu({
       canRemoveFillers={canRemoveFillers}
       isRemovingFillers={isRemovingFillers}
       onRemoveFillers={onRemoveFillers}
+      onRippleInsertBefore={onRippleInsertBefore}
       pendingActivation={pendingActivation}
       onPendingActivationHandled={() => setPendingActivation(null)}
     >
@@ -321,6 +324,7 @@ const ItemContextMenuFull = memo(function ItemContextMenuFull({
   canRemoveFillers,
   isRemovingFillers,
   onRemoveFillers,
+  onRippleInsertBefore,
   pendingActivation,
   onPendingActivationHandled,
 }: Omit<ItemContextMenuProps, 'children'> & {
@@ -600,6 +604,15 @@ const ItemContextMenuFull = memo(function ItemContextMenuFull({
         )}
         {((isCompositionItem && (onEnterComposition || onDissolveComposition)) ||
           (canCreatePreComp && onCreatePreComp)) && <ContextMenuSeparator />}
+
+        {onRippleInsertBefore && (
+          <>
+            <ContextMenuItem onClick={onRippleInsertBefore}>
+              {t('timeline.contextMenu.insertClipWithRipple', 'Insert Clip with Ripple')}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
 
         <ContextMenuItem
           onClick={onRippleDelete}

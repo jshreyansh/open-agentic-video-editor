@@ -146,6 +146,7 @@ export type AudioItem = BaseTimelineItem & {
   src: string
   waveformData?: number[]
   offset?: number // Trim offset in source audio
+  generatedAudioKey?: string // OPFS key for AI-generated audio (voiceover, TTS) — survives page reload
 }
 
 export type TextSpan = {

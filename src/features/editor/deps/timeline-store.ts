@@ -14,4 +14,7 @@ export {
   useCompositionsStore,
   useTimelineCommandStore,
   captureSnapshot,
+  restoreSnapshot,
 } from './timeline-contract'
+export type { TimelineSnapshot } from './timeline-contract'
+export { rippleInsertFromMedia } from '@/features/timeline/stores/actions/item-actions'

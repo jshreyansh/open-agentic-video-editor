@@ -30,6 +30,16 @@ import {
   importMediaLibraryService,
   useMediaLibraryStore,
 } from '@/features/editor/deps/media-library'
+import { useSettingsStore } from '@/features/editor/deps/settings'
+import {
+  generateSpeechFileCartesia,
+  CARTESIA_SPEED_OPTIONS,
+  CARTESIA_MODEL_OPTIONS,
+  CARTESIA_EMOTION_PRESETS,
+  CARTESIA_LANGUAGE_OPTIONS,
+  type CartesiaSpeed,
+  type CartesiaModel,
+} from '@/features/editor/services/cartesia-tts-service'
 import { useTimelineStore } from '@/features/editor/deps/timeline-store'
 import {
   findCompatibleTrackForItemType,
@@ -252,13 +262,28 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
   const loadMediaItems = useMediaLibraryStore((state) => state.loadMediaItems)
   const showNotification = useMediaLibraryStore((state) => state.showNotification)
 
+  const cartesiaApiKey = useSettingsStore((s) => s.cartesiaApiKey)
+  const cartesiaVoiceId = useSettingsStore((s) => s.cartesiaVoiceId)
+
   const [text, setText] = useState('')
-  const [engine, setEngine] = useState<StoredTtsEngine>(() => getStoredTtsEngine())
+  const [engine, setEngine] = useState<StoredTtsEngine>(() => {
+    const {
+      aiVoiceProvider: prov,
+      cartesiaApiKey: key,
+      cartesiaVoiceId: vid,
+    } = useSettingsStore.getState()
+    if (prov === 'cartesia' && key && vid) return 'cartesia'
+    return getStoredTtsEngine()
+  })
   const [kokoroVoice, setKokoroVoice] = useState<KokoroTtsVoice>('af_heart')
   const [mossVoice, setMossVoice] = useState<MossTtsVoice>('Xiaoyu')
   const [supertonicVoice, setSupertonicVoice] = useState<SupertonicTtsVoice>('M3')
   const [supertonicLanguage, setSupertonicLanguage] =
     useState<SupertonicTtsLanguageSelection>('auto')
+  const [cartesiaSpeed, setCartesiaSpeed] = useState<CartesiaSpeed>('normal')
+  const [cartesiaEmotionIndex, setCartesiaEmotionIndex] = useState(0)
+  const [cartesiaLanguage, setCartesiaLanguage] = useState('auto')
+  const [cartesiaModel, setCartesiaModel] = useState<CartesiaModel>('sonic-2')
   const model: KokoroTtsModel = KOKORO_TTS_BEST_MODEL
   const [speed, setSpeed] = useState(1)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -284,7 +309,12 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
         resultUrlRef.current = null
       }
       setText(initialText)
-      setEngine(getStoredTtsEngine())
+      const {
+        aiVoiceProvider: prov,
+        cartesiaApiKey: key,
+        cartesiaVoiceId: vid,
+      } = useSettingsStore.getState()
+      setEngine(prov === 'cartesia' && key && vid ? 'cartesia' : getStoredTtsEngine())
       setError(null)
       setProgress(null)
       setResult(null)
@@ -310,6 +340,7 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
   const isKokoroSupported = kokoroTtsService.isSupported()
   const isMossSupported = mossTtsService.isSupported()
   const isSupertonicSupported = supertonicTtsService.isSupported()
+  const isCartesiaConfigured = !!cartesiaApiKey && !!cartesiaVoiceId
   const supportsNativeSpeed = engine === 'kokoro' || engine === 'supertonic'
   const speedMin = engine === 'supertonic' ? 0.8 : 0.5
   const speedMax = engine === 'supertonic' ? 1.3 : 2
@@ -320,13 +351,22 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
 
   const effectiveSpeed = supportsNativeSpeed ? speed : 1
   const isTtsSupported =
-    engine === 'kokoro'
-      ? isKokoroSupported
-      : engine === 'moss'
-        ? isMossSupported
-        : isSupertonicSupported
+    engine === 'cartesia'
+      ? isCartesiaConfigured
+      : engine === 'kokoro'
+        ? isKokoroSupported
+        : engine === 'moss'
+          ? isMossSupported
+          : isSupertonicSupported
   const trimmedText = text.trim()
-  const voice = engine === 'kokoro' ? kokoroVoice : engine === 'moss' ? mossVoice : supertonicVoice
+  const voice =
+    engine === 'kokoro'
+      ? kokoroVoice
+      : engine === 'moss'
+        ? mossVoice
+        : engine === 'cartesia'
+          ? cartesiaVoiceId
+          : supertonicVoice
   const mossLanguagesLabel = MOSS_TTS_SUPPORTED_LANGUAGES.join(', ')
   const supertonicLanguagesLabel = SUPERTONIC_TTS_SUPPORTED_LANGUAGES.join(', ')
 
@@ -341,14 +381,19 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
     }
     if (!isTtsSupported) {
       setError(
-        engine === 'kokoro'
-          ? t('editor.tts.errors.kokoroUnsupported')
-          : engine === 'moss'
-            ? t('editor.tts.errors.mossUnsupported')
-            : t('editor.tts.errors.supertonicUnsupported', {
-                defaultValue:
-                  'This browser cannot run the local Supertonic TTS runtime. Try a recent Chrome or Edge browser.',
-              }),
+        engine === 'cartesia'
+          ? t('editor.tts.errors.cartesiaUnconfigured', {
+              defaultValue:
+                'Cartesia is not configured. Add your API key and Voice ID in Settings → AI.',
+            })
+          : engine === 'kokoro'
+            ? t('editor.tts.errors.kokoroUnsupported')
+            : engine === 'moss'
+              ? t('editor.tts.errors.mossUnsupported')
+              : t('editor.tts.errors.supertonicUnsupported', {
+                  defaultValue:
+                    'This browser cannot run the local Supertonic TTS runtime. Try a recent Chrome or Edge browser.',
+                }),
       )
       return
     }
@@ -372,28 +417,35 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
         if (sessionIdRef.current === thisSession) setProgress(msg)
       }
       const result =
-        engine === 'kokoro'
-          ? await kokoroTtsService.generateSpeechFile({
-              text: trimmedText,
-              voice: kokoroVoice,
-              speed: effectiveSpeed,
-              model,
-              onProgress,
+        engine === 'cartesia'
+          ? await generateSpeechFileCartesia(trimmedText, cartesiaApiKey, cartesiaVoiceId, {
+              speed: cartesiaSpeed,
+              emotionPresetIndex: cartesiaEmotionIndex,
+              language: cartesiaLanguage,
+              model: cartesiaModel,
             })
-          : engine === 'moss'
-            ? await mossTtsService.generateSpeechFile({
+          : engine === 'kokoro'
+            ? await kokoroTtsService.generateSpeechFile({
                 text: trimmedText,
-                voice: mossVoice,
+                voice: kokoroVoice,
                 speed: effectiveSpeed,
+                model,
                 onProgress,
               })
-            : await supertonicTtsService.generateSpeechFile({
-                text: trimmedText,
-                voice: supertonicVoice,
-                language: supertonicLanguage,
-                speed: effectiveSpeed,
-                onProgress,
-              })
+            : engine === 'moss'
+              ? await mossTtsService.generateSpeechFile({
+                  text: trimmedText,
+                  voice: mossVoice,
+                  speed: effectiveSpeed,
+                  onProgress,
+                })
+              : await supertonicTtsService.generateSpeechFile({
+                  text: trimmedText,
+                  voice: supertonicVoice,
+                  language: supertonicLanguage,
+                  speed: effectiveSpeed,
+                  onProgress,
+                })
 
       const { blob, file, duration } = result
 
@@ -406,32 +458,47 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
       resultUrlRef.current = objectUrl
 
       const voiceLabel =
-        engine === 'kokoro'
-          ? (KOKORO_TTS_VOICE_OPTIONS.find((option) => option.value === kokoroVoice)?.label ??
-            kokoroVoice)
-          : engine === 'moss'
-            ? getMossTtsVoiceOption(mossVoice).label
-            : (SUPERTONIC_TTS_VOICE_OPTIONS.find((option) => option.value === supertonicVoice)
-                ?.label ?? supertonicVoice)
+        engine === 'cartesia'
+          ? 'Cartesia'
+          : engine === 'kokoro'
+            ? (KOKORO_TTS_VOICE_OPTIONS.find((option) => option.value === kokoroVoice)?.label ??
+              kokoroVoice)
+            : engine === 'moss'
+              ? getMossTtsVoiceOption(mossVoice).label
+              : (SUPERTONIC_TTS_VOICE_OPTIONS.find((option) => option.value === supertonicVoice)
+                  ?.label ?? supertonicVoice)
       const modelLabel =
-        engine === 'kokoro' ? 'Best' : engine === 'moss' ? 'Multilingual Nano' : 'Supertonic 3'
+        engine === 'cartesia'
+          ? (CARTESIA_MODEL_OPTIONS.find((o) => o.value === cartesiaModel)?.label ?? cartesiaModel)
+          : engine === 'kokoro'
+            ? 'Best'
+            : engine === 'moss'
+              ? 'Multilingual Nano'
+              : 'Supertonic 3'
       const tags =
-        engine === 'kokoro'
+        engine === 'cartesia'
           ? [
               'ai-generated',
-              'kokoro-tts',
-              'tts-engine:kokoro',
-              `kokoro-quality:${model}`,
-              `kokoro-voice:${kokoroVoice}`,
+              'cartesia-tts',
+              'tts-engine:cartesia',
+              `cartesia-voice:${cartesiaVoiceId}`,
             ]
-          : engine === 'moss'
-            ? ['ai-generated', 'moss-tts', 'tts-engine:moss', `moss-voice:${mossVoice}`]
-            : [
+          : engine === 'kokoro'
+            ? [
                 'ai-generated',
-                'supertonic-tts',
-                'tts-engine:supertonic',
-                `supertonic-voice:${supertonicVoice}`,
+                'kokoro-tts',
+                'tts-engine:kokoro',
+                `kokoro-quality:${model}`,
+                `kokoro-voice:${kokoroVoice}`,
               ]
+            : engine === 'moss'
+              ? ['ai-generated', 'moss-tts', 'tts-engine:moss', `moss-voice:${mossVoice}`]
+              : [
+                  'ai-generated',
+                  'supertonic-tts',
+                  'tts-engine:supertonic',
+                  `supertonic-voice:${supertonicVoice}`,
+                ]
 
       setResult({ file, objectUrl, duration, voice: voiceLabel, model: modelLabel, tags })
       setProgress(null)
@@ -449,6 +516,12 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
       }
     }
   }, [
+    cartesiaApiKey,
+    cartesiaEmotionIndex,
+    cartesiaLanguage,
+    cartesiaModel,
+    cartesiaSpeed,
+    cartesiaVoiceId,
     currentProjectId,
     effectiveSpeed,
     engine,
@@ -530,14 +603,19 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
         <div className="space-y-4">
           {!isTtsSupported && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
-              {engine === 'kokoro'
-                ? t('editor.tts.kokoroUnsupported')
-                : engine === 'moss'
-                  ? t('editor.tts.mossUnsupported')
-                  : t('editor.tts.supertonicUnsupported', {
-                      defaultValue:
-                        'This browser cannot run the local Supertonic TTS runtime. Try a recent Chrome or Edge browser.',
-                    })}
+              {engine === 'cartesia'
+                ? t('editor.tts.cartesiaUnconfigured', {
+                    defaultValue:
+                      'Cartesia is not configured. Add your API key and Voice ID in Settings → AI.',
+                  })
+                : engine === 'kokoro'
+                  ? t('editor.tts.kokoroUnsupported')
+                  : engine === 'moss'
+                    ? t('editor.tts.mossUnsupported')
+                    : t('editor.tts.supertonicUnsupported', {
+                        defaultValue:
+                          'This browser cannot run the local Supertonic TTS runtime. Try a recent Chrome or Edge browser.',
+                      })}
             </div>
           )}
 
@@ -556,6 +634,15 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-80 space-y-2 p-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium">Cartesia</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {t('editor.tts.cartesiaDescription', {
+                          defaultValue:
+                            'Cloud TTS via Cartesia Sonic 2. Requires API key and Voice ID configured in Settings → AI.',
+                        })}
+                      </p>
+                    </div>
                     <div className="space-y-1">
                       <p className="text-xs font-medium">Kokoro</p>
                       <p className="text-[11px] text-muted-foreground">
@@ -588,6 +675,11 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="cartesia" className="text-xs">
+                    {t('editor.tts.cartesiaOption', {
+                      defaultValue: 'Cartesia (cloud, Sonic 2)',
+                    })}
+                  </SelectItem>
                   <SelectItem value="kokoro" className="text-xs">
                     {t('editor.tts.kokoroOption')}
                   </SelectItem>
@@ -604,38 +696,51 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
             </div>
 
             <div className="grid grid-cols-1 gap-3">
-              <div className="space-y-1.5">
-                <Label>{t('editor.tts.voice')}</Label>
-                <Select
-                  value={voice}
-                  onValueChange={(value) => {
-                    if (engine === 'kokoro') {
-                      setKokoroVoice(value as KokoroTtsVoice)
-                    } else if (engine === 'moss') {
-                      setMossVoice(value as MossTtsVoice)
-                    } else {
-                      setSupertonicVoice(value as SupertonicTtsVoice)
-                    }
-                  }}
-                  disabled={isGenerating || isInserting}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {(engine === 'kokoro'
-                      ? KOKORO_TTS_VOICE_OPTIONS
-                      : engine === 'moss'
-                        ? MOSS_TTS_VOICE_OPTIONS
-                        : SUPERTONIC_TTS_VOICE_OPTIONS
-                    ).map((option) => (
-                      <SelectItem key={option.value} value={option.value} className="text-xs">
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {engine === 'cartesia' ? (
+                <div className="rounded-lg border border-border bg-secondary/20 p-2.5 text-[11px] text-muted-foreground">
+                  {t('editor.tts.cartesiaVoiceFromSettings', {
+                    defaultValue: 'Voice ID is taken from Settings → AI.',
+                  })}
+                  {cartesiaVoiceId && (
+                    <span className="ml-1 font-mono text-foreground/60">
+                      {cartesiaVoiceId.slice(0, 20)}…
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label>{t('editor.tts.voice')}</Label>
+                  <Select
+                    value={voice}
+                    onValueChange={(value) => {
+                      if (engine === 'kokoro') {
+                        setKokoroVoice(value as KokoroTtsVoice)
+                      } else if (engine === 'moss') {
+                        setMossVoice(value as MossTtsVoice)
+                      } else {
+                        setSupertonicVoice(value as SupertonicTtsVoice)
+                      }
+                    }}
+                    disabled={isGenerating || isInserting}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {(engine === 'kokoro'
+                        ? KOKORO_TTS_VOICE_OPTIONS
+                        : engine === 'moss'
+                          ? MOSS_TTS_VOICE_OPTIONS
+                          : SUPERTONIC_TTS_VOICE_OPTIONS
+                      ).map((option) => (
+                        <SelectItem key={option.value} value={option.value} className="text-xs">
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {engine === 'supertonic' && (
                 <div className="space-y-1.5">
                   <Label>{t('editor.tts.language', { defaultValue: 'Language' })}</Label>
@@ -666,6 +771,88 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
               )}
             </div>
           </div>
+
+          {/* Cartesia-specific controls */}
+          {engine === 'cartesia' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Model</Label>
+                <Select
+                  value={cartesiaModel}
+                  onValueChange={(v) => setCartesiaModel(v as CartesiaModel)}
+                  disabled={isGenerating || isInserting}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CARTESIA_MODEL_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value} className="text-xs">
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Speed</Label>
+                <Select
+                  value={cartesiaSpeed}
+                  onValueChange={(v) => setCartesiaSpeed(v as CartesiaSpeed)}
+                  disabled={isGenerating || isInserting}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CARTESIA_SPEED_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value} className="text-xs">
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Style</Label>
+                <Select
+                  value={String(cartesiaEmotionIndex)}
+                  onValueChange={(v) => setCartesiaEmotionIndex(Number(v))}
+                  disabled={isGenerating || isInserting}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CARTESIA_EMOTION_PRESETS.map((preset, idx) => (
+                      <SelectItem key={idx} value={String(idx)} className="text-xs">
+                        {preset.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Language</Label>
+                <Select
+                  value={cartesiaLanguage}
+                  onValueChange={setCartesiaLanguage}
+                  disabled={isGenerating || isInserting}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {CARTESIA_LANGUAGE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value} className="text-xs">
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
 
           {/* Text input */}
           <div className="space-y-2">

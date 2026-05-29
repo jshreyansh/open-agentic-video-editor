@@ -17,7 +17,7 @@ import { HOTKEY_OPTIONS } from '@/config/hotkeys'
 import { useSettingsStore, useResolvedHotkeys } from '@/features/timeline/deps/settings'
 
 import { Button } from '@/components/ui/button'
-import { Plus, Minus } from 'lucide-react'
+import { Plus, Minus, ChevronDown, ChevronUp } from 'lucide-react'
 import { CompositionBreadcrumbs } from './composition-breadcrumbs'
 import { useCompositionNavigationStore } from '../stores/composition-navigation-store'
 import {
@@ -138,6 +138,8 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
   })
   const [trackRowsViewportHeight, setTrackRowsViewportHeight] = useState(0)
   const [sectionDividerPosition, setSectionDividerPosition] = useState<number | null>(null)
+
+  const [navigatorOpen, setNavigatorOpen] = useState(true)
 
   const colorScopesOpen = useEditorStore((s) => s.colorScopesOpen)
   const toggleColorScopesOpen = useEditorStore((s) => s.toggleColorScopesOpen)
@@ -860,6 +862,35 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
       role="region"
       aria-label={t('timeline.region')}
     >
+      {/* Navigator Overview Strip */}
+      <div className="flex-shrink-0 border-b border-border">
+        <div
+          className="flex items-center justify-between px-3 bg-secondary/10"
+          style={{ height: 20 }}
+        >
+          <span className="text-[10px] text-muted-foreground/50 font-mono uppercase tracking-widest select-none">
+            Overview
+          </span>
+          <button
+            className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground/80 transition-colors select-none"
+            onClick={() => setNavigatorOpen((v) => !v)}
+          >
+            {navigatorOpen ? (
+              <ChevronUp className="h-3 w-3" />
+            ) : (
+              <ChevronDown className="h-3 w-3" />
+            )}
+          </button>
+        </div>
+        {navigatorOpen && (
+          <TimelineNavigator
+            actualDuration={timelineMetrics.actualDuration}
+            timelineWidth={timelineMetrics.timelineWidth}
+            scrollContainerRef={timelineContentRef}
+          />
+        )}
+      </div>
+
       {/* Timeline Header */}
       <TimelineHeader
         onZoomChange={zoomHandlers?.handleZoomChange}
@@ -981,19 +1012,6 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
         />
       </div>
 
-      <div className="flex flex-shrink-0 overflow-hidden">
-        <div
-          className="border-r border-border panel-bg flex-shrink-0"
-          style={{ width: EDITOR_LAYOUT_CSS_VALUES.timelineSidebarWidth }}
-        />
-        <div className="flex-1 min-w-0">
-          <TimelineNavigator
-            actualDuration={timelineMetrics.actualDuration}
-            timelineWidth={timelineMetrics.timelineWidth}
-            scrollContainerRef={timelineContentRef}
-          />
-        </div>
-      </div>
       <TransitionDragTooltip />
     </div>
   )

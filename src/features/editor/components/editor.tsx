@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, memo, lazy, Suspense } from 'react'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { useNavigate, useRouter, useBlocker } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { createLogger } from '@/shared/logging/logger'
 import { i18n } from '@/i18n'
@@ -40,12 +40,23 @@ import { prewarmEffectPreviews } from '@/features/editor/deps/effects-contract'
 import { getEditorLayout, getEditorLayoutCssVars } from '@/config/editor-layout'
 import { ChatPanel } from '@/features/ai-chat'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   createProjectUpgradeBackup,
   formatProjectUpgradeBackupName,
 } from '@/features/editor/deps/projects'
 import { ProjectUpgradeDialog } from './project-upgrade-dialog'
 import { useClearKeyframesDialogStore } from '@/shared/state/clear-keyframes-dialog'
 import { useTtsGenerateDialogStore } from '@/shared/state/tts-generate-dialog'
+import { useInsertClipDialogStore } from '@/shared/state/insert-clip-dialog/store'
 import { useProjectMediaMatchDialogStore } from '@/shared/state/project-media-match-dialog'
 import {
   importEmbeddedSubtitleTrackPickerHost,
@@ -73,6 +84,11 @@ const LazyClearKeyframesDialog = lazy(() =>
 const LazyTtsGenerateDialog = lazy(() =>
   import('@/features/editor/components/tts-generate-dialog').then((module) => ({
     default: module.TtsGenerateDialog,
+  })),
+)
+const LazyInsertClipDialog = lazy(() =>
+  import('@/features/editor/components/insert-clip-dialog').then((module) => ({
+    default: module.InsertClipDialog,
   })),
 )
 const LazyProjectMediaMatchDialog = lazy(() =>
@@ -185,6 +201,7 @@ export const Editor = memo(function Editor({ projectId, project, migration }: Ed
 const EditorDialogHost = memo(function EditorDialogHost({ projectId }: { projectId: string }) {
   const clearKeyframesDialogOpen = useClearKeyframesDialogStore((s) => s.isOpen)
   const ttsGenerateDialogOpen = useTtsGenerateDialogStore((s) => s.isOpen)
+  const insertClipDialogOpen = useInsertClipDialogStore((s) => s.isOpen)
   const projectMediaMatchDialogOpen = useProjectMediaMatchDialogStore(
     (s) => s.isOpen && s.projectId === projectId,
   )
@@ -206,6 +223,11 @@ const EditorDialogHost = memo(function EditorDialogHost({ projectId }: { project
       {ttsGenerateDialogOpen && (
         <Suspense fallback={null}>
           <LazyTtsGenerateDialog />
+        </Suspense>
+      )}
+      {insertClipDialogOpen && (
+        <Suspense fallback={null}>
+          <LazyInsertClipDialog />
         </Suspense>
       )}
       {embeddedSubtitlePickerOpen && (
@@ -458,6 +480,41 @@ export const LoadedEditor = memo(function LoadedEditor({
     onSave: handleSave,
   })
 
+  // Debounced silent auto-save: 5 s after any change, save without a toast.
+  // Complements the interval-based auto-save so data is never lost on refresh.
+  const debouncedSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!isDirty) {
+      if (debouncedSaveRef.current) {
+        clearTimeout(debouncedSaveRef.current)
+        debouncedSaveRef.current = null
+      }
+      return
+    }
+    debouncedSaveRef.current = setTimeout(() => {
+      if (isSavingRef.current || !useTimelineStore.getState().isDirty) return
+      isSavingRef.current = true
+      void useTimelineStore
+        .getState()
+        .saveTimeline(projectId)
+        .catch((err) => logger.error('Debounced auto-save failed:', err))
+        .finally(() => {
+          isSavingRef.current = false
+        })
+    }, 5_000)
+    return () => {
+      if (debouncedSaveRef.current) clearTimeout(debouncedSaveRef.current)
+    }
+  }, [isDirty, projectId])
+
+  // Block navigation (back swipe, browser back, router navigate) when there are
+  // unsaved changes. Shows a confirmation dialog before leaving.
+  const blocker = useBlocker({
+    shouldBlockFn: () => isDirty,
+    withResolver: true,
+    enableBeforeUnload: isDirty,
+  })
+
   // Enable timeline shortcuts (space, cut tool, rate tool, etc.)
   useTimelineShortcuts()
 
@@ -607,6 +664,38 @@ export const LoadedEditor = memo(function LoadedEditor({
       <ReverseConformDialog />
       <SilenceRemovalDialog />
       <FillerRemovalDialog />
+
+      {/* Navigation blocker — shown when user tries to leave with unsaved changes */}
+      <AlertDialog open={blocker.status === 'blocked'}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave editor?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Save before leaving or they will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>Stay</AlertDialogCancel>
+            <AlertDialogAction
+              className="border border-input bg-background text-foreground hover:bg-accent"
+              onClick={async () => {
+                try {
+                  await handleSave()
+                } catch {}
+                blocker.proceed?.()
+              }}
+            >
+              Save &amp; Leave
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => blocker.proceed?.()}
+            >
+              Leave without saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 })

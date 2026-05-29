@@ -26,6 +26,7 @@ import { useTimelineCommandStore } from './timeline-command-store'
 import { useCompositionsStore } from './compositions-store'
 import { useCompositionNavigationStore } from './composition-navigation-store'
 import { getProject, updateProject, saveProjectThumbnail } from '@/infrastructure/storage'
+import { resolveGeneratedAudioItems } from '@/infrastructure/storage/generated-audio'
 import {
   renderSingleFrame,
   convertTimelineToComposition,
@@ -937,6 +938,13 @@ export async function loadTimeline(
       )
       useItemsStore.getState().setTracks(sortedTracks as TimelineTrack[])
       useItemsStore.getState().setItems(hydratedItems)
+
+      // Re-create blob URLs for AI-generated audio (voiceover/TTS) from OPFS.
+      // Blob URLs from previous sessions are invalid after page reload.
+      void resolveGeneratedAudioItems(
+        (hydratedItems as AudioItem[]).filter((i) => i.type === 'audio'),
+        (id, src) => useItemsStore.getState()._updateItem(id, { src }),
+      )
       useTransitionsStore.getState().setTransitions((t.transitions || []) as Transition[])
       useKeyframesStore.getState().setKeyframes((t.keyframes || []) as ItemKeyframes[])
       useMarkersStore.getState().setMarkers(t.markers || [])

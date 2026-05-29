@@ -8,8 +8,13 @@ export {
   CAPTIONING_INTERVAL_BOUNDS,
   DEFAULT_CAPTIONING_INTERVAL_SECONDS,
   resolveCaptioningIntervalSec,
+  GEMINI_TTS_VOICES,
 } from '@/features/settings/stores/settings-store'
-export type { CaptioningIntervalUnit } from '@/features/settings/stores/settings-store'
+export type {
+  CaptioningIntervalUnit,
+  TtsProvider,
+  GeminiTtsVoice,
+} from '@/features/settings/stores/settings-store'
 export { LocalInferenceUnloadControl } from '@/features/settings/components/local-inference-unload-control'
 export { LocalModelCacheControl } from '@/features/settings/components/local-model-cache-control'
 export { useResolvedHotkeys } from '@/features/settings/hooks/use-resolved-hotkeys'

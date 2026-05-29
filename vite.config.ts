@@ -3,6 +3,22 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { GoogleAuth } from 'google-auth-library'
+
+// Load .env.local (and .env) into process.env for server-side plugin use.
+// Vite only injects VITE_-prefixed vars into client code; server-side proxy code
+// reads process.env directly so we populate it here before plugins initialise.
+for (const envFile of ['.env', '.env.local']) {
+  try {
+    const content = readFileSync(new URL(`./${envFile}`, import.meta.url), 'utf8')
+    for (const line of content.split('\n')) {
+      const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.+)$/)
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim()
+    }
+  } catch {
+    /* file doesn't exist — skip */
+  }
+}
 
 const oxlintConfig = JSON.parse(readFileSync(new URL('./.oxlintrc.json', import.meta.url), 'utf8'))
 const oxfmtConfig = JSON.parse(readFileSync(new URL('./.oxfmtrc.json', import.meta.url), 'utf8'))
@@ -15,59 +31,122 @@ const toolIgnorePatterns = [
   'scripts/**',
 ]
 
-// Vite plugin: proxy /api/claude to Anthropic (local dev only)
-function claudeApiProxy() {
+type ServerMiddlewareHandler = (
+  req: import('http').IncomingMessage,
+  res: import('http').ServerResponse,
+) => void
+
+// Vite plugin: proxy /api/gemini to Vertex AI Gemini using ADC (local dev only).
+// Accepts ?model=<name> query param to target different Gemini models (e.g. TTS).
+// Default model: gemini-2.5-flash
+function geminiApiProxy() {
+  const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] })
+
   return {
-    name: 'claude-api-proxy',
+    name: 'gemini-api-proxy',
     configureServer(server: {
-      middlewares: {
-        use: (
-          path: string,
-          handler: (
-            req: import('http').IncomingMessage,
-            res: import('http').ServerResponse,
-          ) => void,
-        ) => void
-      }
+      middlewares: { use: (path: string, h: ServerMiddlewareHandler) => void }
     }) {
-      server.middlewares.use('/api/claude', (req, res) => {
+      server.middlewares.use('/api/gemini', (req, res) => {
+        const chunks: Buffer[] = []
+        req.on('data', (chunk: Buffer) => chunks.push(chunk))
+        req.on('end', () => {
+          const body = Buffer.concat(chunks).toString()
+          // Parse model from query string: /api/gemini?model=gemini-2.5-flash-preview-tts
+          const url = new URL(req.url ?? '', 'http://localhost')
+          const model = url.searchParams.get('model') ?? 'gemini-2.5-flash'
+
+          void (async () => {
+            try {
+              const projectId = process.env['GOOGLE_CLOUD_PROJECT'] ?? (await auth.getProjectId())
+              const location = process.env['GOOGLE_CLOUD_LOCATION'] ?? 'us-central1'
+              const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`
+
+              const client = await auth.getClient()
+              const tokenResponse = await client.getAccessToken()
+              const token = tokenResponse.token
+
+              if (!token) {
+                res.statusCode = 401
+                res.setHeader('Content-Type', 'application/json')
+                res.end(
+                  JSON.stringify({
+                    error: {
+                      message: 'ADC not configured. Run: gcloud auth application-default login',
+                    },
+                  }),
+                )
+                return
+              }
+
+              const r = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body,
+              })
+              const data = await r.text()
+              res.statusCode = r.status
+              res.setHeader('Content-Type', 'application/json')
+              res.end(data)
+            } catch (err) {
+              res.statusCode = 500
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: { message: String(err) } }))
+            }
+          })()
+        })
+      })
+    },
+  }
+}
+
+// Vite plugin: proxy /api/cartesia to Cartesia TTS API (local dev only).
+// Reads API key from X-Cartesia-Api-Key request header (supplied by client settings UI)
+// or falls back to CARTESIA_API_KEY env var.
+function cartesiaApiProxy() {
+  return {
+    name: 'cartesia-api-proxy',
+    configureServer(server: {
+      middlewares: { use: (path: string, h: ServerMiddlewareHandler) => void }
+    }) {
+      server.middlewares.use('/api/cartesia', (req, res) => {
         const chunks: Buffer[] = []
         req.on('data', (chunk: Buffer) => chunks.push(chunk))
         req.on('end', () => {
           const body = Buffer.concat(chunks).toString()
           const apiKey =
-            (req.headers as Record<string, string | undefined>)['x-claude-api-key'] ??
-            process.env['ANTHROPIC_API_KEY']
+            (req.headers['x-cartesia-api-key'] as string | undefined) ??
+            process.env['CARTESIA_API_KEY'] ??
+            ''
+
           if (!apiKey) {
-            res.statusCode = 400
+            res.statusCode = 401
             res.setHeader('Content-Type', 'application/json')
-            res.end(
-              JSON.stringify({
-                error: { message: 'No API key — enter your Anthropic key in the AI Chat panel.' },
-              }),
-            )
+            res.end(JSON.stringify({ error: 'Cartesia API key not configured' }))
             return
           }
-          fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01',
-            },
-            body,
-          })
-            .then(async (r) => {
-              const data = await r.text()
+
+          void (async () => {
+            try {
+              const r = await fetch('https://api.cartesia.ai/tts/bytes', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Cartesia-Version': '2024-06-10',
+                  'X-API-Key': apiKey,
+                },
+                body,
+              })
+              const data = await r.arrayBuffer()
               res.statusCode = r.status
-              res.setHeader('Content-Type', 'application/json')
-              res.end(data)
-            })
-            .catch((err: unknown) => {
+              res.setHeader('Content-Type', r.headers.get('content-type') ?? 'audio/wav')
+              res.end(Buffer.from(data))
+            } catch (err) {
               res.statusCode = 500
               res.setHeader('Content-Type', 'application/json')
-              res.end(JSON.stringify({ error: { message: String(err) } }))
-            })
+              res.end(JSON.stringify({ error: String(err) }))
+            }
+          })()
         })
       })
     },
@@ -102,7 +181,7 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
     },
   },
-  plugins: lazyPlugins(() => [react(), tailwindcss(), claudeApiProxy()]),
+  plugins: lazyPlugins(() => [react(), tailwindcss(), geminiApiProxy(), cartesiaApiProxy()]),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

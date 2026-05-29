@@ -308,7 +308,6 @@ export function useTimelineDrag(
   const setDragState = useSelectionStore((s) => s.setDragState)
   const setActiveSnapTarget = useSelectionStore((s) => s.setActiveSnapTarget)
   const setActiveLinkedDropTarget = useSelectionStore((s) => s.setActiveLinkedDropTarget)
-
   const clearLinkedMovePreview = useCallback(() => {
     if (linkedMovePreviewSignatureRef.current === '') {
       return
@@ -739,6 +738,7 @@ export function useTimelineDrag(
       const altKeyChanged = isAltDragRef.current !== e.altKey
       isAltDragRef.current = e.altKey
 
+      // Shift key toggle — insert mode (Shift+drag ripple-inserts instead of overwrite)
       // Calculate clamped delta to prevent visual preview from going below frame 0
       const deltaFrames = pixelsToFramePreciseRef.current(deltaX)
       const draggedItems = dragStateRef.current.draggedItems

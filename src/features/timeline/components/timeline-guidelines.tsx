@@ -6,27 +6,28 @@ import { useTimelineZoomContext } from '../contexts/timeline-zoom-context'
 /**
  * Timeline Guidelines Component
  *
- * Renders vertical snap line for the active snap target during drag operations
- * - Green line for magnetic snap (item edges)
- * - Primary color for playhead snap
- *
- * Only shows when actively snapping to magnetic or playhead targets
+ * Renders two types of vertical indicators:
+ * 1. Snap guideline — green/primary line when magnetically snapping during drag
+ * 2. Insert blade  — bright green blade + badge when ⌘-dragging in insert mode
  */
 export function TimelineGuidelines() {
   const { frameToPixels } = useTimelineZoomContext()
-  const containerRef = useRef<HTMLDivElement>(null)
-  const lineRef = useRef<HTMLDivElement>(null)
+  const snapContainerRef = useRef<HTMLDivElement>(null)
+  const snapLineRef = useRef<HTMLDivElement>(null)
+  const insertContainerRef = useRef<HTMLDivElement>(null)
+  const insertLineRef = useRef<HTMLDivElement>(null)
   const activeSnapTargetRef = useRef<SnapTarget | null>(
     useSelectionStore.getState().activeSnapTarget,
   )
+  const insertIndicatorFrameRef = useRef<number | null>(
+    useSelectionStore.getState().insertIndicatorFrame,
+  )
 
-  const syncGuideline = useCallback(
+  const syncSnapGuideline = useCallback(
     (activeSnapTarget: SnapTarget | null) => {
-      const container = containerRef.current
-      const line = lineRef.current
-      if (!container || !line) {
-        return
-      }
+      const container = snapContainerRef.current
+      const line = snapLineRef.current
+      if (!container || !line) return
 
       if (!activeSnapTarget) {
         container.style.display = 'none'
@@ -47,38 +48,96 @@ export function TimelineGuidelines() {
     [frameToPixels],
   )
 
-  useEffect(() => {
-    syncGuideline(activeSnapTargetRef.current)
+  const syncInsertBlade = useCallback(
+    (frame: number | null) => {
+      const container = insertContainerRef.current
+      const line = insertLineRef.current
+      if (!container || !line) return
 
-    return useSelectionStore.subscribe((state, previous) => {
-      if (state.activeSnapTarget === previous.activeSnapTarget) {
+      if (frame === null) {
+        container.style.display = 'none'
         return
       }
 
+      container.style.display = ''
+      line.style.left = `${frameToPixels(frame)}px`
+    },
+    [frameToPixels],
+  )
+
+  // Snap guideline subscription
+  useEffect(() => {
+    syncSnapGuideline(activeSnapTargetRef.current)
+
+    return useSelectionStore.subscribe((state, previous) => {
+      if (state.activeSnapTarget === previous.activeSnapTarget) return
       activeSnapTargetRef.current = state.activeSnapTarget
-      syncGuideline(state.activeSnapTarget)
+      syncSnapGuideline(state.activeSnapTarget)
     })
-  }, [syncGuideline])
+  }, [syncSnapGuideline])
 
   useEffect(() => {
-    syncGuideline(activeSnapTargetRef.current)
-  }, [syncGuideline])
+    syncSnapGuideline(activeSnapTargetRef.current)
+  }, [syncSnapGuideline])
+
+  // Insert blade subscription
+  useEffect(() => {
+    syncInsertBlade(insertIndicatorFrameRef.current)
+
+    return useSelectionStore.subscribe((state, previous) => {
+      if (state.insertIndicatorFrame === previous.insertIndicatorFrame) return
+      insertIndicatorFrameRef.current = state.insertIndicatorFrame
+      syncInsertBlade(state.insertIndicatorFrame)
+    })
+  }, [syncInsertBlade])
+
+  useEffect(() => {
+    syncInsertBlade(insertIndicatorFrameRef.current)
+  }, [syncInsertBlade])
 
   return (
-    <div
-      ref={containerRef}
-      className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 10000, display: 'none' }}
-    >
+    <>
+      {/* Snap guideline */}
       <div
-        ref={lineRef}
-        className="absolute top-0 bottom-0 w-px"
-        style={{
-          backgroundColor: 'var(--color-timeline-snap)',
-          opacity: 0.9,
-          boxShadow: '0 0 4px var(--color-timeline-snap)',
-        }}
-      />
-    </div>
+        ref={snapContainerRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 10000, display: 'none' }}
+      >
+        <div
+          ref={snapLineRef}
+          className="absolute top-0 bottom-0 w-px"
+          style={{
+            backgroundColor: 'var(--color-timeline-snap)',
+            opacity: 0.9,
+            boxShadow: '0 0 4px var(--color-timeline-snap)',
+          }}
+        />
+      </div>
+
+      {/* Insert mode blade */}
+      <div
+        ref={insertContainerRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 10001, display: 'none' }}
+      >
+        <div
+          ref={insertLineRef}
+          className="absolute top-0 bottom-0"
+          style={{
+            width: 2,
+            backgroundColor: 'rgb(34,197,94)',
+            boxShadow: '0 0 6px rgba(34,197,94,0.8)',
+          }}
+        >
+          {/* INSERT badge at top */}
+          <div
+            className="absolute top-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-wide"
+            style={{ backgroundColor: 'rgb(34,197,94)', color: '#000' }}
+          >
+            INSERT
+          </div>
+        </div>
+      </div>
+    </>
   )
 }

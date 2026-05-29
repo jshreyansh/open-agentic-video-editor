@@ -23,6 +23,7 @@ import { useEditorStore } from '@/shared/state/editor'
 import { useSourcePlayerStore } from '@/shared/state/source-player'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { useTransitionDragStore } from '@/shared/state/transition-drag'
+import { useInsertClipDialogStore } from '@/shared/state/insert-clip-dialog/store'
 import { TRANSITION_CONFIGS } from '@/types/transition'
 import { useMediaLibraryStore } from '@/features/timeline/deps/media-library-store'
 import { mediaTranscriptionService } from '@/features/timeline/deps/media-transcription-service'
@@ -87,6 +88,7 @@ import { ToolOperationOverlay } from './tool-operation-overlay'
 import { FloatingReadout } from './floating-readout'
 import { supportsVisualFadeControls } from './visual-fade-items'
 import { getTimelineItemGestureMode } from './drag-visual-mode'
+import { FxBar } from './fx-bar'
 import { getTimelineClipLabelRowHeightPx } from './hover-layout'
 import {
   getSlideOperationBoundsVisual,
@@ -1915,6 +1917,10 @@ export const TimelineItem = memo(
       addEffects,
     })
 
+    const handleRippleInsertBefore = useCallback(() => {
+      useInsertClipDialogStore.getState().open(item.from, item.trackId)
+    }, [item.from, item.trackId])
+
     // Composition operations
     const isVisualFadeItem = supportsVisualFadeControls(item)
     const [videoFadeEdit, setVideoFadeEdit] = useState<{
@@ -3271,6 +3277,7 @@ export const TimelineItem = memo(
           }
           isRemovingFillers={isRemovingFillers}
           onRemoveFillers={handleRemoveFillers}
+          onRippleInsertBefore={handleRippleInsertBefore}
         >
           <div
             ref={transformRef}
@@ -3427,6 +3434,7 @@ export const TimelineItem = memo(
                   isShape={item.type === 'shape'}
                 />
               )}
+              <FxBar item={item} fps={fps} isVisual={item.type !== 'audio'} />
             </div>
 
             {!useCompactClipShell && isVisualFadeItem && (
