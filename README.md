@@ -1,23 +1,31 @@
-# FreeCut
+# Open-Agentic-Video-Editor
 
-**[freecut.net](http://freecut.net/)**
-
-**Edit videos. In your browser.**
+**Edit videos with AI. In your browser.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-![FreeCut Timeline Editor](./public/assets/landing/timeline.png)
+Open-Agentic-Video-Editor is a fully browser-based, multi-track video editor with a built-in agentic AI assistant. No install, no uploads — projects and media stay local, while editing, preview, AI generation, transcription, analysis, and export all run in the browser through WebGPU, WebCodecs, Web Workers, OPFS, and the File System Access API.
 
-FreeCut is a browser-based, multi-track video editor. No install, no uploads:
-projects and media stay local, while editing, preview, analysis, transcription,
-AI generation, and export run in the browser through WebGPU, WebCodecs, Web
-Workers, OPFS, and the File System Access API.
-
-FreeCut writes projects, linked media metadata, thumbnails, waveforms, generated
-AI assets, transcripts, scene cuts, and caches as plain files inside a workspace
-folder you choose on disk.
+The AI chat panel lets you describe edits in plain language. The agent calls timeline tools in a multi-turn loop, sees the results of each action, and can ask clarifying questions before acting — so complex edits work reliably without blind JSON generation.
 
 ## Features
+
+### AI Agentic Editing
+
+- Multi-turn Gemini agent loop — AI calls tools, reads results, retries, and reasons across up to 8 iterations per request
+- 30+ timeline tools: query state, move/trim/split clips, add text, voiceovers, effects, transitions, and more
+- `ask_user` clarification tool — AI pauses and asks which clip or track you mean before acting
+- Live tool progress shown in the chat panel as each action executes
+- `add_captions_from_script` — paste a timestamped script and AI places captions over the video on a dedicated caption track
+- `add_voiceover` — generate TTS audio from text and place it on the timeline synced to captions
+- Focus tracking — AI remembers the last edited clip so you don't need to repeat context
+
+### Voiceover Recording (DaVinci Resolve-style)
+
+- Mic button in the transport bar launches a 3-2-1 countdown overlay
+- Video plays while you narrate — recording syncs to the playhead position
+- Stop button or end of timeline auto-stops recording
+- Recording placed immediately as an audio item at the correct timeline position
 
 ### Timeline & Editing
 
@@ -32,7 +40,7 @@ folder you choose on disk.
 ### Preview & Playback
 
 - Real-time preview with transform, crop, corner-pin, mask, and group gizmos
-- Frame-accurate playback through FreeCut's custom `Clock` and composition runtime
+- Frame-accurate playback through a custom `Clock` and composition runtime
 - Fast scrub overlays, decoder prewarming, adaptive preview quality, and source warming
 - Two-up and four-up edit panels for ripple, rolling, slip, and slide operations
 - GPU color scopes: waveform, vectorscope, and histogram
@@ -70,7 +78,7 @@ All visual effects and compositing paths are WebGPU-first, with fallbacks where 
 - Auto-keyframe mode, tangent mirroring, property accordions, and marquee selection
 - Animated transform, crop, mask, text, effect, and color properties
 
-### Media, AI & Analysis
+### Media & Analysis
 
 - Import videos, audio, images, GIFs, SVGs, and generated assets without copying originals
 - Proxy generation, thumbnail extraction, waveform caching, and media relinking
@@ -80,7 +88,6 @@ All visual effects and compositing paths are WebGPU-first, with fallbacks where 
 - Scene Browser for searching captioned media and reusing detected moments
 - Local Kokoro text-to-speech voiceovers
 - Local MusicGen music generation with presets, progress, and cancellation
-- Local model cache controls and unload controls in settings
 
 ### Projects & Storage
 
@@ -104,8 +111,8 @@ All visual effects and compositing paths are WebGPU-first, with fallbacks where 
 **Prerequisites:** Node.js 22+ recommended, npm 11+, and a modern Chromium browser.
 
 ```bash
-git clone https://github.com/walterlow/freecut.git
-cd freecut
+git clone https://github.com/shreyansjaiswal/open-agentic-video-editor.git
+cd open-agentic-video-editor/editor
 npm install
 npm run dev
 ```
@@ -118,14 +125,13 @@ Open [http://localhost:5173](http://localhost:5173) in Chrome, Edge, Brave, or A
 2. Create a project from the projects page.
 3. Import media by dragging files into the media library.
 4. Drag clips to the timeline, then trim, arrange, add effects, transitions, masks, captions, and audio work.
-5. Use the source monitor, keyframe editor, scene browser, AI tools, and preview overlays as needed.
-6. Export directly from the browser.
+5. Open the AI chat panel and describe edits in plain language — the agent handles the rest.
+6. Record a voiceover using the mic button in the transport bar while watching the video play.
+7. Export directly from the browser.
 
 ## Browser Support
 
-Chrome or Edge 113+ is recommended. FreeCut depends on WebGPU, WebCodecs, OPFS,
-and the File System Access API, so a modern Chromium browser is required for the
-full workflow.
+Chrome or Edge 113+ is recommended. Open-Agentic-Video-Editor depends on WebGPU, WebCodecs, OPFS, and the File System Access API, so a modern Chromium browser is required for the full workflow.
 
 ### Brave
 
@@ -193,61 +199,6 @@ Brave may disable the File System Access API. To enable it:
 - [Kokoro.js](https://www.npmjs.com/package/kokoro-js) for WebGPU text-to-speech
 - Web Workers and AudioWorklets for heavy media processing off the main thread
 
-## Development
-
-Most commands are npm scripts backed by `vite-plus` (`vp`).
-
-```bash
-npm run dev                 # Dev server on port 5173
-npm run dev:quiet           # Dev server with perf-focused env
-npm run dev:compare         # Run dev and local perf preview together
-npm run build               # Production build
-npm run build:perf          # Production build using `.env.perf`
-npm run preview             # Preview the production build
-npm run preview:perf        # Serve production build on port 4173
-npm run perf                # Build + serve a production-like perf target
-
-npm run lint                # Oxlint through Vite+
-npm run lint:fix            # Oxlint autofix
-npm run format              # Oxfmt
-npm run format:check        # Check formatting with Oxfmt
-npm run check               # Vite+ check without formatting
-npm run check:fix           # Vite+ check with fixes
-
-npm run test                # Vite+ test watch mode
-npm run test:run            # Vite+ test single run
-npm run test:coverage       # Vite+ coverage
-npm run test:preview-sync   # Focused preview sync suite
-npm run test:preview-sync:stress # Repeated preview sync stress runner
-
-npm run check:boundaries            # Feature boundary architecture check
-npm run check:deps-contracts        # Enforce deps contract adapter routing
-npm run check:legacy-lib-imports    # Tripwire: block any "@/lib/*" import (layer removed)
-npm run check:deps-wrapper-health   # Fail on unused pass-through deps wrappers
-npm run check:edge-budgets          # Feature coupling budget check
-npm run report:feature-edges        # Human-readable feature edge report
-npm run report:feature-edges:json   # JSON feature edge report
-npm run report:deps-wrapper-health:json # JSON deps wrapper health report
-npm run verify                      # Full local quality gate
-
-npm run routes              # Regenerate TanStack Router route tree
-npm run changelog:append    # Append generated changelog data
-npm run changelog:rollup    # Roll changelog data into release notes
-```
-
-### Performance Checks
-
-- `npm run dev` is best for correctness and iteration, but includes React/Vite dev overhead, HMR, and debug instrumentation.
-- `npm run perf` is the better check for real playback or rendering performance because it serves a production build locally.
-- `npm run dev:quiet` keeps HMR while hiding the editor debug panel.
-- `npm run dev:compare` starts `http://localhost:5173` and `http://localhost:4173` together for side-by-side dev vs production-like checks.
-
-### Environment
-
-```env
-VITE_SHOW_DEBUG_PANEL=true   # Show debug panel in dev
-```
-
 ## Project Structure
 
 ```text
@@ -255,8 +206,8 @@ src/
 |- app/                     # App bootstrap, error boundary, PWA install prompt, debug utilities
 |- components/              # shadcn/ui components and brand assets
 |- config/                  # Hotkeys and editor layout configuration
-|- data/                    # Generated app data, including changelog JSON
 |- features/                # User-facing UI modules
+|  |- ai-chat/               # Agentic AI chat: agent loop, tool registry, TTS, transcription
 |  |- editor/                # Editor shell, toolbar, panels, dialogs, deps adapters
 |  |- effects/               # Effect registry and effect UI
 |  |- export/                # WebCodecs export pipeline and canvas fallback rendering
@@ -268,57 +219,26 @@ src/
 |  |- scene-browser/         # Caption and scene search UI
 |  |- settings/              # Settings store, hotkey editor, model cache controls
 |  |- timeline/              # Timeline UI, tools, stores, services, workers
+|  |- voiceover/             # DaVinci-style voiceover recording feature
 |  \- workspace-gate/        # Workspace picker, permission gate, workspace switcher
 |- runtime/                 # Playback and rendering engines (not user-facing UI)
 |  |- composition-runtime/   # Composition renderer, media layout, audio graph, masks
 |  \- player/                # Clock, player primitives, video source pools
 |- infrastructure/          # Platform adapters: browser, storage, GPU, analysis, audio, thumbnails
-|  |- analysis/              # Scene detection, captioning, embeddings, optical flow
-|  |- audio/                 # SoundTouch-based time-stretch
-|  |- browser/               # Blob/object URL and Mediabunny input adapters
-|  |- gpu-effects/           # WebGPU effect pipeline + shader definitions
-|  |- gpu-transitions/       # WebGPU transition pipeline + shaders
-|  |- gpu-compositor/        # WebGPU blend-mode compositor
-|  |- gpu-masks/             # Mask combine pipeline + texture manager
-|  |- gpu-media/             # Media render/blend pipelines
-|  |- gpu-scopes/            # Waveform/vectorscope/histogram renderers
-|  |- gpu-shapes/            # Shape render pipeline
-|  |- gpu-text/              # Glyph-atlas text pipeline
-|  |- gpu-shared/            # WGSL fragments shared across GPU modules
-|  |- storage/               # Workspace FS, handles DB, legacy IDB migration
-|  \- thumbnails/            # GPU-backed thumbnail generation adapters
 |- routes/                  # TanStack Router file routes
 |- shared/                  # Framework-agnostic primitives + cross-feature state
-|  |- timeline/              # Transition engine/registry/renderers, defaults
-|  |- projects/              # Schema migrations and normalization
-|  |- state/                 # Cross-feature Zustand stores
-|  |- marquee/               # Marquee-selection hook + overlay (paired)
-|  |- ui/                    # cn helper, property controls
-|  |- logging/               # Structured logger
-|  |- typography/            # Font loading, text style presets
-|  |- graphics/              # Shape generators and path helpers
-|  \- utils/                 # Workers, color/curve math, easing, time helpers
-|- test/                    # Test setup
 \- types/                   # Shared TypeScript types
 ```
 
-Feature modules should use their local `deps/` adapters for cross-feature
-imports. Platform-coupled code (GPU, ML, audio, storage, browser) lives in
-`@/infrastructure/*` and is imported directly; there is no separate `lib/`
-layer.
-
-Layer notes:
-
-- [src/infrastructure/README.md](src/infrastructure/README.md)
-- [src/shared/README.md](src/shared/README.md)
-- Feature `deps/README.md` files inside individual feature folders
+Feature modules use their local `deps/` adapters for all cross-feature imports. Platform-coupled code (GPU, ML, audio, storage, browser) lives in `@/infrastructure/*`.
 
 ## Contributing
 
-FreeCut is open source but not open contribution. Pull requests are not accepted at this time.
+Open-Agentic-Video-Editor is open source. Contributions, bug reports, and feature requests are welcome.
 
 - **Report bugs:** open an issue
 - **Suggest features:** start a discussion
+- **Pull requests:** welcome — please open an issue first for larger changes
 
 ## License
 

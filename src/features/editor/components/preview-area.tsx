@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react'
+import { usePlaybackStore } from '@/shared/state/playback'
 import { Columns2 } from 'lucide-react'
 import {
   VideoPreview,
@@ -20,6 +21,7 @@ import { EDITOR_LAYOUT_CSS_VALUES, getEditorLayout } from '@/config/editor-layou
 import { InteractionLockRegion } from './interaction-lock-region'
 import { Button } from '@/components/ui/button'
 import { ErrorBoundary } from '@/app/error-boundary'
+import { VoiceoverRecorder } from '@/features/editor/deps/voiceover-contract'
 
 interface PreviewAreaProps {
   project: {
@@ -277,6 +279,13 @@ export const PreviewArea = memo(function PreviewArea({ project }: PreviewAreaPro
   const [sourceSplitPercent, setSourceSplitPercent] = useState(PREVIEW_SOURCE_SPLIT_DEFAULT_PERCENT)
   const [scopesSplitPercent, setScopesSplitPercent] = useState(PREVIEW_SCOPES_SPLIT_DEFAULT_PERCENT)
   const [isPanelDragging, setIsPanelDragging] = useState(false)
+  const [voiceoverOpen, setVoiceoverOpen] = useState(false)
+  const [voiceoverStartFrame, setVoiceoverStartFrame] = useState(0)
+
+  const handleVoiceoverStart = useCallback(() => {
+    setVoiceoverStartFrame(usePlaybackStore.getState().currentFrame)
+    setVoiceoverOpen(true)
+  }, [])
 
   const splitContainerRef = useRef<HTMLDivElement>(null)
   const isDraggingSourceSplitRef = useRef(false)
@@ -529,6 +538,13 @@ export const PreviewArea = memo(function PreviewArea({ project }: PreviewAreaPro
               containerSize={containerSize}
               suspendOverlay={isPanelDragging}
             />
+            {voiceoverOpen && (
+              <VoiceoverRecorder
+                startFrame={voiceoverStartFrame}
+                fps={fps}
+                onClose={() => setVoiceoverOpen(false)}
+              />
+            )}
           </div>
 
           {isPenModeActive ? (
@@ -653,7 +669,12 @@ export const PreviewArea = memo(function PreviewArea({ project }: PreviewAreaPro
 
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="flex items-center gap-2.5 pointer-events-auto">
-                      <PlaybackControls totalFrames={totalFrames} fps={fps} />
+                      <PlaybackControls
+                        totalFrames={totalFrames}
+                        fps={fps}
+                        onVoiceoverStart={handleVoiceoverStart}
+                        voiceoverActive={voiceoverOpen}
+                      />
                     </div>
                   </div>
 

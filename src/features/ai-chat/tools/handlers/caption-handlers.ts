@@ -1,11 +1,41 @@
 import { registerTool } from '../tool-registry'
 import { useTimelineStore } from '@/features/ai-chat/deps/timeline-store'
-import {
-  findCompatibleTrackForItemType,
-  findNearestAvailableSpace,
-} from '@/features/ai-chat/deps/timeline-utils'
+import { findNearestAvailableSpace } from '@/features/ai-chat/deps/timeline-utils'
 import { addItem } from '@/features/ai-chat/deps/timeline-actions'
-import type { TextItem } from '@/types/timeline'
+import { createClassicTrack } from '@/features/ai-chat/deps/timeline-contract'
+import type { TextItem, TimelineTrack } from '@/types/timeline'
+
+/**
+ * Find a track suitable for captions: video-kind but containing no video/image clips.
+ * If none exists, create a new video track above the topmost existing track.
+ */
+function getOrCreateCaptionTrack(): TimelineTrack {
+  const { tracks, items } = useTimelineStore.getState()
+
+  // Prefer a video-kind track that has no video or image items (a caption-only layer)
+  const captionTrack = [...tracks]
+    .sort((a, b) => a.order - b.order)
+    .find((track) => {
+      if (track.isGroup || track.locked) return false
+      if (track.kind === 'audio') return false
+      const hasVideoClip = items.some(
+        (item) => item.trackId === track.id && (item.type === 'video' || item.type === 'image'),
+      )
+      return !hasVideoClip
+    })
+
+  if (captionTrack) return captionTrack
+
+  // No caption-safe track exists — create one above the current top track
+  const minOrder = tracks.reduce((min, t) => Math.min(min, t.order), 0)
+  const newTrack = createClassicTrack({
+    tracks,
+    kind: 'video',
+    order: minOrder - 1,
+  })
+  useTimelineStore.getState().setTracks([...tracks, newTrack])
+  return newTrack
+}
 
 function parseTimeToFrames(time: string, fps: number): number {
   const parts = time
@@ -97,6 +127,7 @@ The tool splits long narration text into readable on-screen caption chunks and d
     }
 
     const fps = useTimelineStore.getState().fps
+    const captionTrack = getOrCreateCaptionTrack()
     let totalCaptions = 0
     const sceneResults: Array<{ scene: number; captions: number; error?: string }> = []
 
@@ -142,26 +173,16 @@ The tool splits long narration text into readable on-screen caption chunks and d
           : Math.max(minFrames, Math.round(proportion * sceneDurationFrames))
 
         try {
-          const { tracks, items } = useTimelineStore.getState()
-          const textTrack = findCompatibleTrackForItemType({
-            tracks,
-            items,
-            itemType: 'text',
-            preferredTrackId: undefined,
-          })
-
-          if (!textTrack) {
-            sceneError = 'no text track available'
-            break
-          }
+          const { items } = useTimelineStore.getState()
 
           const finalFrom =
-            findNearestAvailableSpace(currentFrame, durFrames, textTrack.id, items) ?? currentFrame
+            findNearestAvailableSpace(currentFrame, durFrames, captionTrack.id, items) ??
+            currentFrame
 
           const textItem: TextItem = {
             id: crypto.randomUUID(),
             type: 'text',
-            trackId: textTrack.id,
+            trackId: captionTrack.id,
             from: finalFrom,
             durationInFrames: durFrames,
             label: cap.slice(0, 40),

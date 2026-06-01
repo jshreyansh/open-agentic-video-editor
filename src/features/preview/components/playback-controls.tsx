@@ -13,6 +13,7 @@ import {
   Zap,
   Camera,
   Loader2,
+  Mic,
 } from 'lucide-react'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { usePreviewBridgeStore } from '@/shared/state/preview-bridge'
@@ -28,6 +29,8 @@ import { MonitorVolumeControl } from './monitor-volume-control'
 interface PlaybackControlsProps {
   totalFrames: number
   fps: number
+  onVoiceoverStart?: () => void
+  voiceoverActive?: boolean
 }
 
 async function canvasToBlob(
@@ -98,7 +101,12 @@ const btnSize = {
   height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
 } as const
 
-export function PlaybackControls({ totalFrames, fps }: PlaybackControlsProps) {
+export function PlaybackControls({
+  totalFrames,
+  fps,
+  onVoiceoverStart,
+  voiceoverActive = false,
+}: PlaybackControlsProps) {
   const { t } = useTranslation()
   const [isSavingFrame, setIsSavingFrame] = useState(false)
 
@@ -341,6 +349,29 @@ export function PlaybackControls({ totalFrames, fps }: PlaybackControlsProps) {
           <Zap className="w-3.5 h-3.5" />
         </Button>
       </div>
+
+      {/* Voiceover recording — hidden at narrow widths */}
+      {onVoiceoverStart && (
+        <div className="hidden @min-[440px]:flex items-center gap-0.5 flex-shrink-0">
+          <Separator orientation="vertical" className="h-4 flex-shrink-0" />
+          <Button
+            variant="ghost"
+            size="icon"
+            style={btnSize}
+            className={`flex-shrink-0 transition-colors ${
+              voiceoverActive
+                ? 'text-red-500 bg-red-500/10 hover:bg-red-500/20 animate-pulse'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={onVoiceoverStart}
+            disabled={voiceoverActive}
+            data-tooltip="Record voiceover (plays video while you narrate)"
+            aria-label="Record voiceover"
+          >
+            <Mic className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
     </>
   )
 }
