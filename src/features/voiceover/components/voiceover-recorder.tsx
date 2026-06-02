@@ -10,6 +10,7 @@ import {
   findNearestAvailableSpace,
   useTimelineStore,
 } from '../deps/timeline-contract'
+import { importMediaLibraryService, useMediaLibraryStore } from '../deps/media-library-contract'
 
 const log = createLogger('voiceover-recorder')
 
@@ -47,9 +48,28 @@ export function VoiceoverRecorder({ startFrame, fps, onClose }: VoiceoverRecorde
     recorder.onstop = async () => {
       recorder.stream.getTracks().forEach((t) => t.stop())
       try {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-        const src = URL.createObjectURL(blob)
-        const durationFrames = Math.max(1, Math.round((durationMs / 1000) * fps))
+        const mimeType = recorder.mimeType || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type: mimeType })
+        const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm'
+        const file = new File([blob], `voiceover-recording.${ext}`, {
+          type: mimeType,
+          lastModified: Date.now(),
+        })
+
+        const projectId = useMediaLibraryStore.getState().currentProjectId
+        if (!projectId) throw new Error('No project open')
+
+        // Persist to workspace so it survives session reload
+        const { mediaLibraryService } = await importMediaLibraryService()
+        const savedMedia = await mediaLibraryService.importGeneratedAudio(file, projectId, {
+          tags: ['voiceover-recording'],
+        })
+        useMediaLibraryStore.getState().prependMediaItem(savedMedia)
+
+        const durationFrames = Math.max(
+          1,
+          Math.round((savedMedia.duration ?? durationMs / 1000) * fps),
+        )
 
         const { tracks, items } = useTimelineStore.getState()
         const audioTrack = findCompatibleTrackForItemType({
@@ -63,17 +83,20 @@ export function VoiceoverRecorder({ startFrame, fps, onClose }: VoiceoverRecorde
         const from =
           findNearestAvailableSpace(startFrame, durationFrames, audioTrack.id, items) ?? startFrame
 
+        const itemId = crypto.randomUUID()
         const audioItem: AudioItem = {
-          id: crypto.randomUUID(),
+          id: itemId,
           type: 'audio',
           trackId: audioTrack.id,
           from,
           durationInFrames: durationFrames,
           label: 'Voice recording',
-          src,
+          mediaId: savedMedia.id,
+          originId: crypto.randomUUID(),
+          src: URL.createObjectURL(blob),
         }
         addItem(audioItem)
-        toast.success('Voice recording added to timeline')
+        toast.success('Voice recording saved and added to timeline')
         onCloseRef.current()
       } catch (err) {
         log.error('Failed to save voiceover recording', err)
