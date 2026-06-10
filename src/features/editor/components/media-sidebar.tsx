@@ -20,6 +20,7 @@ import {
   Blend,
   Pen,
   WandSparkles,
+  RectangleHorizontal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/shared/ui/cn'
@@ -418,48 +419,59 @@ export const MediaSidebar = memo(function MediaSidebar() {
   )
 
   // Add shape item to timeline at the best available position
-  const handleAddShape = useCallback((shapeType: ShapeType) => {
-    // Read all needed state from stores directly to avoid subscriptions
-    const { tracks, items, fps, addItem } = useTimelineStore.getState()
-    const { activeTrackId, selectItems } = useSelectionStore.getState()
-    const currentProject = useProjectStore.getState().currentProject
+  const handleAddShape = useCallback(
+    (
+      shapeType: ShapeType,
+      options?: {
+        transformOverrides?: import('@/types/transform').TransformProperties
+        label?: string
+      },
+    ) => {
+      // Read all needed state from stores directly to avoid subscriptions
+      const { tracks, items, fps, addItem } = useTimelineStore.getState()
+      const { activeTrackId, selectItems } = useSelectionStore.getState()
+      const currentProject = useProjectStore.getState().currentProject
 
-    const targetTrack = findCompatibleTrackForItemType({
-      tracks,
-      items,
-      itemType: 'shape',
-      preferredTrackId: activeTrackId,
-    })
+      const targetTrack = findCompatibleTrackForItemType({
+        tracks,
+        items,
+        itemType: 'shape',
+        preferredTrackId: activeTrackId,
+      })
 
-    if (!targetTrack) {
-      logger.warn('No available track for shape item')
-      return
-    }
+      if (!targetTrack) {
+        logger.warn('No available track for shape item')
+        return
+      }
 
-    const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps)
+      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps)
 
-    // Find the best position: start at playhead, find nearest available space
-    const proposedPosition = usePlaybackStore.getState().currentFrame
-    const finalPosition =
-      findNearestAvailableSpace(proposedPosition, durationInFrames, targetTrack.id, items) ??
-      proposedPosition
+      // Find the best position: start at playhead, find nearest available space
+      const proposedPosition = usePlaybackStore.getState().currentFrame
+      const finalPosition =
+        findNearestAvailableSpace(proposedPosition, durationInFrames, targetTrack.id, items) ??
+        proposedPosition
 
-    const canvasWidth = currentProject?.metadata.width ?? 1920
-    const canvasHeight = currentProject?.metadata.height ?? 1080
+      const canvasWidth = currentProject?.metadata.width ?? 1920
+      const canvasHeight = currentProject?.metadata.height ?? 1080
 
-    const shapeItem: ShapeItem = createDefaultShapeItem({
-      trackId: targetTrack.id,
-      from: finalPosition,
-      durationInFrames,
-      canvasWidth,
-      canvasHeight,
-      shapeType,
-    })
+      const shapeItem: ShapeItem = createDefaultShapeItem({
+        trackId: targetTrack.id,
+        from: finalPosition,
+        durationInFrames,
+        canvasWidth,
+        canvasHeight,
+        shapeType,
+        transformOverrides: options?.transformOverrides,
+        label: options?.label,
+      })
 
-    addItem(shapeItem)
-    // Select the new item
-    selectItems([shapeItem.id])
-  }, [])
+      addItem(shapeItem)
+      // Select the new item
+      selectItems([shapeItem.id])
+    },
+    [],
+  )
 
   // Add adjustment layer to timeline at the best available position
   // Optionally with pre-applied effects and custom label
@@ -871,6 +883,42 @@ export const MediaSidebar = memo(function MediaSidebar() {
                   </div>
                   <span className="text-[9px] text-muted-foreground group-hover:text-foreground">
                     {t('editor.shapeSection.typeRectangle')}
+                  </span>
+                </button>
+
+                <button
+                  draggable={true}
+                  onDragStart={handleTemplateDragStart({
+                    itemType: 'shape',
+                    label: 'Freeform Rect',
+                    shapeType: 'rectangle',
+                  })}
+                  onDragEnd={handleTemplateDragEnd}
+                  onClick={() => {
+                    if (shouldSuppressGeneratedItemClick()) return
+                    const project = useProjectStore.getState().currentProject
+                    const cw = project?.metadata.width ?? 1920
+                    const ch = project?.metadata.height ?? 1080
+                    handleAddShape('rectangle', {
+                      label: 'Freeform Rect',
+                      transformOverrides: {
+                        x: 0,
+                        y: 0,
+                        width: cw * 0.4,
+                        height: ch * 0.225,
+                        rotation: 0,
+                        opacity: 1,
+                        aspectRatioLocked: false,
+                      },
+                    })
+                  }}
+                  className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/50 hover:border-primary/50 transition-colors group"
+                >
+                  <div className="w-7 h-7 rounded border border-border bg-secondary/50 flex items-center justify-center group-hover:bg-secondary/70">
+                    <RectangleHorizontal className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />
+                  </div>
+                  <span className="text-[9px] text-muted-foreground group-hover:text-foreground">
+                    Freeform Rect
                   </span>
                 </button>
 

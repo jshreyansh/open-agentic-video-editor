@@ -10,6 +10,10 @@ import {
   findNearestAvailableSpace,
 } from '@/features/ai-chat/deps/timeline-utils'
 import { addItem } from '@/features/ai-chat/deps/timeline-actions'
+import {
+  importMediaLibraryService,
+  useMediaLibraryStore,
+} from '@/features/ai-chat/deps/media-library-contract'
 import type { AudioItem, TextItem } from '@/types/timeline'
 
 const VOICES: GeminiVoice[] = ['Kore', 'Aoede', 'Puck', 'Charon', 'Fenrir', 'Zephyr']
@@ -86,35 +90,58 @@ export function VoiceRecorder({ onClose, placementFrame = 0 }: VoiceRecorderProp
     mediaRecorderRef.current = null
   }, [])
 
-  const placeRawRecording = useCallback(() => {
+  const placeRawRecording = useCallback(async () => {
     const blob = audioBlobRef.current
     if (!blob) return
-    const src = audioBlobUrl ?? URL.createObjectURL(blob)
-    const { tracks, items, fps } = useTimelineStore.getState()
-    const track = findCompatibleTrackForItemType({
-      tracks,
-      items,
-      itemType: 'audio',
-      preferredTrackId: undefined,
-    })
-    if (!track) {
-      setError('No audio track available')
-      return
+    setStage('processing')
+    try {
+      const mimeType = blob.type || 'audio/webm'
+      const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm'
+      const file = new File([blob], `voiceover-recording.${ext}`, {
+        type: mimeType,
+        lastModified: Date.now(),
+      })
+      const projectId = useMediaLibraryStore.getState().currentProjectId
+      if (!projectId) throw new Error('No project open')
+      const { mediaLibraryService } = await importMediaLibraryService()
+      const savedMedia = await mediaLibraryService.importGeneratedAudio(file, projectId, {
+        tags: ['voiceover-recording'],
+      })
+      useMediaLibraryStore.getState().prependMediaItem(savedMedia)
+
+      const { tracks, items, fps } = useTimelineStore.getState()
+      const track = findCompatibleTrackForItemType({
+        tracks,
+        items,
+        itemType: 'audio',
+        preferredTrackId: undefined,
+      })
+      if (!track) throw new Error('No audio track available')
+
+      const durationFrames = Math.max(
+        1,
+        Math.round((savedMedia.duration ?? blob.size / (24000 * 2)) * fps),
+      )
+      const from =
+        findNearestAvailableSpace(placementFrame, durationFrames, track.id, items) ?? placementFrame
+
+      const audioItem: AudioItem = {
+        id: crypto.randomUUID(),
+        type: 'audio',
+        trackId: track.id,
+        from,
+        durationInFrames: durationFrames,
+        label: 'Voice recording',
+        mediaId: savedMedia.id,
+        originId: crypto.randomUUID(),
+        src: URL.createObjectURL(blob),
+      }
+      addItem(audioItem)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save recording')
+      setStage('review')
     }
-    const durationInFrames = Math.round((blob.size / (24000 * 2)) * fps) // rough estimate
-    const from =
-      findNearestAvailableSpace(placementFrame, durationInFrames, track.id, items) ?? placementFrame
-    const audioItem: AudioItem = {
-      id: crypto.randomUUID(),
-      type: 'audio',
-      trackId: track.id,
-      from,
-      durationInFrames,
-      label: 'Voice recording',
-      src,
-    }
-    addItem(audioItem)
-    onClose()
   }, [audioBlobUrl, placementFrame, onClose])
 
   const addCaptionsFromTranscript = useCallback(async () => {

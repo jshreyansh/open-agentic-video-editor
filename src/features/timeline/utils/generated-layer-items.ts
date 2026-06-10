@@ -1,5 +1,6 @@
 import type { VisualEffect } from '@/types/effects'
 import type { AdjustmentItem, ShapeItem, ShapeType, TextItem } from '@/types/timeline'
+import type { TransformProperties } from '@/types/transform'
 import {
   TEXT_STYLE_PRESETS,
   buildTextStylePresetTemplate,
@@ -146,9 +147,22 @@ export function createTextTemplateItem(params: {
 }
 
 export function createDefaultShapeItem(
-  params: VisualLayerPlacement & { shapeType: ShapeType },
+  params: VisualLayerPlacement & {
+    shapeType: ShapeType
+    transformOverrides?: Partial<TransformProperties>
+    label?: string
+  },
 ): ShapeItem {
-  const { trackId, from, durationInFrames, canvasWidth, canvasHeight, shapeType } = params
+  const {
+    trackId,
+    from,
+    durationInFrames,
+    canvasWidth,
+    canvasHeight,
+    shapeType,
+    transformOverrides,
+    label,
+  } = params
   const shapeSize = Math.min(canvasWidth, canvasHeight) * 0.25
 
   return {
@@ -157,7 +171,7 @@ export function createDefaultShapeItem(
     trackId,
     from,
     durationInFrames,
-    label: shapeType.charAt(0).toUpperCase() + shapeType.slice(1),
+    label: label ?? shapeType.charAt(0).toUpperCase() + shapeType.slice(1),
     shapeType,
     fillColor: '#3b82f6',
     strokeColor: undefined,
@@ -174,6 +188,7 @@ export function createDefaultShapeItem(
       rotation: 0,
       opacity: 1,
       aspectRatioLocked: true,
+      ...transformOverrides,
     },
   }
 }
